@@ -33,7 +33,7 @@ uses
   uFile,
   uFileViewWorker,
   uOrderedFileView,
-  uFileView,
+  uFileView,  
   uDragDropEx;
 
 type
@@ -225,8 +225,9 @@ uses
   GTK2Globals,  // for DblClickTime
 {$ENDIF}
   LCLIntf, LCLProc, LazUTF8, Forms, Dialogs, Buttons, DCOSUtils,
+  strutils,
   fMain, uShowMsg, uLng, uFileProperty, uFileSource, uFileSourceOperationTypes,
-  uGlobs, uInfoToolTip, uDisplayFile, uFileSystemFileSource, uFileSourceUtil,
+  uGlobs, uInfoToolTip, uDisplayFile, uFileSystemFileSource, uFileSourceUtil,  
   uArchiveFileSourceUtil, uFormCommands, uKeyboard, uFileSourceSetFilePropertyOperation;
 
 type
@@ -1042,8 +1043,30 @@ begin
 end;
 
 procedure TFileViewWithMainCtrl.MainControlUTF8KeyPress(Sender: TObject; var UTF8Key: TUTF8Char);
+var
+	i:integer;
+	p:String;
 begin
   if IsLoadingFileList then Exit;
+
+{$iFDEF MSWINDOWS} //add SHIFT+X to goto drive X: in windows
+	    if (ssShift in  GetKeyShiftStateEx) and (UTF8Key[1] in ['A'..'Z']) then
+	    begin
+		    p:=UTF8Key[1]+':';
+		    for I:= 0 to glsDirHistory.Count - 1 do
+		    begin
+			    if AnsiStartsText(p,glsDirHistory[I]) then
+			    begin
+				    p:=glsDirHistory[I];
+				    break;
+			    end;
+		    end;
+		    frmMain.Commands.cm_ChangeDir(p);
+		    exit;
+	    end;
+
+{$ENDIF}
+
 
   // check if ShiftState is equal to quick search / filter modes
   if quickSearch.CheckSearchOrFilter(UTF8Key) then

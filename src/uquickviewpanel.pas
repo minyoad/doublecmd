@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    Quick view panel
 
-   Copyright (C) 2009-2019 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2009-2022 Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ unit uQuickViewPanel;
 interface
 
 uses
-  Classes, SysUtils, ExtCtrls, fViewer,
+  Classes, SysUtils, Controls, ExtCtrls, fViewer,
   uFileViewNotebook, uFile, uFileSource, uFileView;
 
 type
@@ -46,6 +46,12 @@ type
     procedure OnChangeFileView(Sender: TObject);
     procedure CreateViewer(aFileView: TFileView);
     procedure FileViewChangeActiveFile(Sender: TFileView; const aFile : TFile);
+
+    function handleLinksToLocal( const Sender:TFileView; const aFile:TFile; var fullPath:String; var showMsg:String ): Boolean;
+    function handleNotDirect( const Sender:TFileView; const aFile:TFile; var fullPath:String; var showMsg:String ): Boolean;
+    function handleDirect( const Sender:TFileView; const aFile:TFile; var fullPath:String; var showMsg:String ): Boolean;
+  protected
+     procedure DoOnShowHint(HintInfo: PHintInfo) override;
   public
     constructor Create(TheOwner: TComponent; aParent: TFileViewPage); reintroduce;
     destructor Destroy; override;
@@ -60,7 +66,7 @@ var
 implementation
 
 uses
-  LCLProc, Forms, Controls, fMain, uTempFileSystemFileSource,
+  LCLProc, Forms, fMain, uTempFileSystemFileSource, uLng,
   uFileSourceProperty, uFileSourceOperation, uFileSourceOperationTypes;
 
 procedure QuickViewShow(aFileViewPage: TFileViewPage; aFileView: TFileView);
@@ -80,11 +86,19 @@ end;
 
 procedure QuickViewClose;
 begin
-  FreeAndNil(QuickViewPanel);
-  frmMain.actQuickView.Checked:= False;
+  if Assigned(QuickViewPanel) then
+  begin
+    FreeAndNil(QuickViewPanel);
+    frmMain.actQuickView.Checked:= False;
+  end;
 end;
 
 { TQuickViewPanel }
+
+procedure TQuickViewPanel.DoOnShowHint(HintInfo: PHintInfo);
+begin
+  HintInfo^.HintStr:= '';
+end;
 
 constructor TQuickViewPanel.Create(TheOwner: TComponent; aParent: TFileViewPage);
 begin
@@ -112,6 +126,7 @@ procedure TQuickViewPanel.CreateViewer(aFileView: TFileView);
 begin
   FViewer:= TfrmViewer.Create(Self, nil, True);
   FViewer.Parent:= Self;
+  FViewer.ShowHint:= false;
   FViewer.BorderStyle:= bsNone;
   FViewer.Align:= alClient;
   FFirstFile:= True;
@@ -124,16 +139,16 @@ end;
 
 procedure TQuickViewPanel.LoadFile(const aFileName: String);
 begin
-  if FFirstFile then
-    begin
-      FFirstFile:= False;
-      FViewer.LoadFile(aFileName);
-      FViewer.Show;
-    end
-  else
-    begin
-      FViewer.LoadNextFile(aFileName);
-    end;
+  if (not FFirstFile) then
+  begin
+    FViewer.LoadNextFile(aFileName);
+  end
+  else begin
+    FFirstFile:= False;
+    Caption:= EmptyStr;
+    FViewer.LoadFile(aFileName);
+    FViewer.Show;
+  end;
   // Viewer can steal focus, so restore it
   if not FFileView.Focused then FFileView.SetFocus;
 end;
@@ -146,67 +161,129 @@ end;
 
 procedure TQuickViewPanel.FileViewChangeActiveFile(Sender: TFileView; const aFile: TFile);
 var
+  fullPath: String;
+  showMsg: String;
+begin
+  fullPath:= EmptyStr;
+  showMsg:= EmptyStr;
+  try
+    if not Assigned(aFile) then
+      raise EAbort.Create(rsMsgErrNotSupported);
+
+    if not handleLinksToLocal(Sender, aFile, fullPath, showMsg) then
+      if not handleNotDirect(Sender, aFile, fullPath, showMsg) then
+        handleDirect(Sender, aFile, fullPath, showMsg);
+
+    if fullPath.IsEmpty() and ShowMsg.IsEmpty() then
+      showMsg:= rsMsgErrNotSupported;
+  except
+    on E: EAbort do
+    begin
+      showMsg:= E.Message;
+    end;
+  end;
+
+  if not fullPath.IsEmpty() then begin
+    LoadFile( fullPath );
+  end else begin
+    FViewer.Hide;
+    FFirstFile:= True;
+    Caption:= showMsg;
+    FViewer.LoadFile(EmptyStr);
+  end;
+end;
+
+// return true if it should handle it, otherwise return false
+// If files are links to local files
+// for example: results from searching
+function TQuickViewPanel.handleLinksToLocal( const Sender:TFileView; const aFile:TFile; var fullPath:String; var showMsg:String ): Boolean;
+var
+  ActiveFile: TFile = nil;
+begin
+  if not (fspLinksToLocalFiles in Sender.FileSource.Properties) then exit(false);
+  Result:= true;
+  if not aFile.IsNameValid then exit;
+
+  FFileSource := Sender.FileSource;
+  ActiveFile:= aFile.Clone;
+
+  try
+    if not FFileSource.GetLocalName(ActiveFile) then exit;
+    fullPath:= ActiveFile.FullPath;
+  finally
+    FreeAndNil(ActiveFile);
+  end;
+end;
+
+// return true if it should handle it, otherwise return false
+// If files not directly accessible copy them to temp file source.
+// for examples: ftp
+function TQuickViewPanel.handleNotDirect( const Sender:TFileView; const aFile:TFile; var fullPath:String; var showMsg:String ): Boolean;
+var
   ActiveFile: TFile = nil;
   TempFiles: TFiles = nil;
-  TempFileSource: ITempFileSystemFileSource = nil;
   Operation: TFileSourceOperation = nil;
+  TempFileSource: ITempFileSystemFileSource = nil;
 begin
-  if not (Assigned(aFile) and (aFile.Name <> '..')) then Exit;
+  if (fspDirectAccess in Sender.FileSource.Properties) then exit(false);
+  Result:= true;
+  if SameText(FFileName, aFile.Name) then exit;
+  FFileName:= aFile.Name;
+
+  if aFile.IsDirectory or aFile.IsLinkToDirectory then exit;
+  if not (fsoCopyOut in Sender.FileSource.GetOperationsTypes) then exit;
+
+  ActiveFile:= aFile.Clone;
+  TempFiles:= TFiles.Create(ActiveFile.Path);
+  TempFiles.Add(aFile.Clone);
+
   try
-    // If files are links to local files
-    if (fspLinksToLocalFiles in Sender.FileSource.Properties) then
-      begin
-        if aFile.IsDirectory or aFile.IsLinkToDirectory then Exit;
-        FFileSource := Sender.FileSource;
-        ActiveFile:= aFile.Clone;
-        if not FFileSource.GetLocalName(ActiveFile) then Exit;
-      end
-    // If files not directly accessible copy them to temp file source.
-    else if not (fspDirectAccess in Sender.FileSource.Properties) then
-      begin
-        if aFile.IsDirectory or SameText(FFileName, aFile.Name) then Exit;
-        if not (fsoCopyOut in Sender.FileSource.GetOperationsTypes) then Exit;
+    if FFileSource.IsClass(TTempFileSystemFileSource) then
+      TempFileSource := (FFileSource as ITempFileSystemFileSource)
+    else
+      TempFileSource := TTempFileSystemFileSource.GetFileSource;
 
-       ActiveFile:= aFile.Clone;
-       TempFiles:= TFiles.Create(ActiveFile.Path);
-       TempFiles.Add(aFile.Clone);
+    Operation := Sender.FileSource.CreateCopyOutOperation(
+                     TempFileSource,
+                     TempFiles,
+                     TempFileSource.FileSystemRoot);
 
-       if FFileSource.IsClass(TTempFileSystemFileSource) then
-         TempFileSource := (FFileSource as ITempFileSystemFileSource)
-       else
-         TempFileSource := TTempFileSystemFileSource.GetFileSource;
+    if not Assigned(Operation) then exit;
 
-       Operation := Sender.FileSource.CreateCopyOutOperation(
-                        TempFileSource,
-                        TempFiles,
-                        TempFileSource.FileSystemRoot);
+    Sender.Enabled:= False;
+    try
+      Operation.Execute;
+    finally
+      FreeAndNil(Operation);
+      Sender.Enabled:= True;
+    end;
 
-       if not Assigned(Operation) then Exit;
-
-       Sender.Enabled:= False;
-       try
-         Operation.Execute;
-       finally
-         FreeAndNil(Operation);
-         Sender.Enabled:= True;
-       end;
-
-       FFileName:= ActiveFile.Name;
-       FFileSource := TempFileSource;
-       ActiveFile.Path:= TempFileSource.FileSystemRoot;
-     end
-   else
-     begin
-       // We can use the file source directly.
-       FFileSource := Sender.FileSource;
-       ActiveFile:= aFile.Clone;
-     end;
-
-  LoadFile(ActiveFile.FullPath);
-
+    FFileSource := TempFileSource;
+    ActiveFile.Path:= TempFileSource.FileSystemRoot;
+    fullPath:= ActiveFile.FullPath;
   finally
     FreeAndNil(TempFiles);
     FreeAndNil(ActiveFile);
+  end;
+end;
+
+// return true if it should handle it, otherwise return false
+// for examples: file system
+function TQuickViewPanel.handleDirect( const Sender:TFileView; const aFile:TFile; var fullPath:String; var showMsg:String ): Boolean;
+var
+  parentDir: String;
+begin
+  Result:= true;
+  FFileSource:= Sender.FileSource;
+
+  if aFile.IsNameValid then begin
+    fullPath:= aFile.FullPath;
+  end else begin
+    parentDir:= FFileSource.GetParentDir( aFile.Path );
+    if FFileSource.IsPathAtRoot(parentDir) then
+      showMsg:= rsPropsFolder + ': ' + parentDir
+    else
+      fullPath:= parentDir;
   end;
 end;
 

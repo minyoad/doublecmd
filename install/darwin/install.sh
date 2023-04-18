@@ -29,13 +29,15 @@ mkdir -p $DC_INSTALL_DIR/plugins/wdx/audioinfo
 # WFX plugins directories
 mkdir -p $DC_INSTALL_DIR/plugins/wfx
 mkdir -p $DC_INSTALL_DIR/plugins/wfx/ftp
+# WLX plugins directories
+mkdir -p $DC_INSTALL_DIR/plugins/wlx
+mkdir -p $DC_INSTALL_DIR/plugins/wlx/MacPreview
 
 # Copy files
 cp -r doublecmd.app/*              $DC_APP_DIR/
 cp -a doublecmd                    $DC_INSTALL_DIR/
 cp -a doublecmd.help               $DC_INSTALL_DIR/
 cp -a doublecmd.zdli               $DC_INSTALL_DIR/
-cp -a doublecmd.ext.example        $DC_INSTALL_DIR/
 cp -a pixmaps.txt                  $DC_INSTALL_DIR/
 cp -a multiarc.ini                 $DC_INSTALL_DIR/
 cp -a pinyin.tbl                   $DC_INSTALL_DIR/
@@ -61,6 +63,8 @@ install -m 644 plugins/wdx/audioinfo/audioinfo.lng  $DC_INSTALL_DIR/plugins/wdx/
 cp -r plugins/wfx/ftp/language                      $DC_INSTALL_DIR/plugins/wfx/ftp
 install -m 644 plugins/wfx/ftp/ftp.wfx              $DC_INSTALL_DIR/plugins/wfx/ftp/
 install -m 644 plugins/wfx/ftp/src/ftp.ico          $DC_INSTALL_DIR/plugins/wfx/ftp/
+# WLX
+install -m 644 plugins/wlx/MacPreview/MacPreview.wlx $DC_INSTALL_DIR/plugins/wlx/MacPreview/
 
 # Copy documentation
 mkdir -p $DC_INSTALL_DIR/doc

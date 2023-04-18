@@ -21,7 +21,6 @@ type
     procedure ShareEnum;
     procedure ShellEnum;
     procedure WorkgroupEnum;
-    function Linux: Boolean;
     function Connect: Boolean;
   public
     constructor Create(aFileSource: IFileSource; aPath: String); override;
@@ -34,17 +33,6 @@ uses
   LazUTF8, uFile, Windows, JwaWinNetWk, JwaLmCons, JwaLmShare, JwaLmApiBuf,
   StrUtils, DCStrUtils, uShowMsg, DCOSUtils, uOSUtils, uNetworkThread, uMyWindows,
   ShlObj, ComObj, DCConvertEncoding, uShellFolder, uShlObjAdditional;
-
-function TWinNetListOperation.Linux: Boolean;
-var
-  APath: String;
-begin
-  Result:= CheckWin32Version(10);
-  if Result then begin
-    APath:= LowerCase(Path);
-    Result:= StrBegins(APath, '\\wsl$\') or StrBegins(APath, '\\wsl.localhost\');
-  end;
-end;
 
 function TWinNetListOperation.Connect: Boolean;
 var
@@ -238,7 +226,7 @@ begin
     // Shared directory
     if not IsNetworkPath(Path) then
     begin
-      if Linux or Connect then
+      if Connect then
         inherited MainExecute;
     end
     else begin

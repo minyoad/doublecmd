@@ -64,6 +64,9 @@ uses
   {$IFDEF LCLQT5}
   , qt5
   {$ENDIF}
+  {$IFDEF LCLQT6}
+  , qt6
+  {$ENDIF}
   {$IFDEF LCLGTK2}
   , gtk2
   {$ENDIF}
@@ -91,7 +94,7 @@ begin
       sl.LoadFromFile(FileName);
       Result := True;
     except
-      on EFilerError do; // Bypass
+      on EStreamError do sl.Free;
     end;
   end;
 end;
@@ -130,14 +133,39 @@ begin
       if Result <> EmptyStr then
         Result := TrimQuotes(Result)
       else
-        Result := sl.Values['DISTRIB_ID'] +
-                  sl.Values['DISTRIB_RELEASE'] +
+        Result := sl.Values['DISTRIB_ID'] + ' ' +
+                  sl.Values['DISTRIB_RELEASE'] + ' ' +
                   sl.Values['DISTRIB_CODENAME'];
     end;
   finally
     sl.Free;
   end;
 end;
+
+function GetOsFromOsRelease: String;
+var
+  sl: TStringListEx;
+begin
+  Result := EmptyStr;
+
+  if GetStringsFromFile('/etc/os-release', sl) then
+  try
+    if sl.Count > 0 then
+    begin
+      Result := sl.Values['PRETTY_NAME'];
+
+      if Result <> EmptyStr then
+        Result := TrimQuotes(Result)
+      else
+        Result := sl.Values['NAME'] + ' ' +
+                  sl.Values['VERSION'] + ' ' +
+                  sl.Values['ID'];
+    end;
+  finally
+    sl.Free;
+  end;
+end;
+
 
 function GetOsFromProcVersion: String;
 var
@@ -447,11 +475,15 @@ begin
     OSVersion := GetMacOSXVersion;
   {$ENDIF}
 
+  // Try using linux systemd base.
+  if OSVersion = EmptyStr then
+    OSVersion := GetOsFromOsRelease;
+
   // Other methods.
   if OSVersion = EmptyStr then
-    OSVersion := GetOsFromIssue;
-  if OSVersion = EmptyStr then
     OSVersion := GetOsFromProcVersion;
+  if OSVersion = EmptyStr then
+    OSVersion := GetOsFromIssue;
 
   // Set default names.
   if OSVersion = EmptyStr then
@@ -464,6 +496,8 @@ begin
     OSVersion := 'FreeBSD';
     {$ELSEIF DEFINED(BSD)}
     OSVersion := 'BSD';
+    {$ELSEIF DEFINED(HAIKU)}
+    OSVersion := 'Haiku';
     {$ELSE}
     OSVersion := 'Unix';
     {$ENDIF}
@@ -471,7 +505,7 @@ begin
   end;
   {$ENDIF}
 
-  {$IF DEFINED(LCLQT) or DEFINED(LCLQT5)}
+  {$IF DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6)}
   WSVersion := 'Qt ' + QtVersion + ', libQt' + QtVersion[0] + 'Pas ';
 
   WSVersion := WSVersion + IntToStr((QT_VERSION shr 16) and 255) + '.' +

@@ -1,6 +1,7 @@
 inherited frmOptionsFilesViews: TfrmOptionsFilesViews
   Height = 550
   Width = 640
+  HelpKeyword = '/configuration.html#ConfigView'
   ClientHeight = 550
   ClientWidth = 640
   DesignLeft = 200
@@ -215,7 +216,6 @@ inherited frmOptionsFilesViews: TfrmOptionsFilesViews
       Top = 31
       Width = 379
       Anchors = [akTop, akLeft, akRight]
-      AutoSize = False
       BorderSpacing.Left = 10
       DropDownCount = 12
       ItemHeight = 15
@@ -511,6 +511,7 @@ inherited frmOptionsFilesViews: TfrmOptionsFilesViews
     Top = 317
     Width = 628
     Anchors = [akTop, akLeft, akRight]
+    AutoSize = True
     BorderSpacing.Around = 6
     Caption = 'Personalized abbreviations to use:'
     ChildSizing.LeftRightSpacing = 12

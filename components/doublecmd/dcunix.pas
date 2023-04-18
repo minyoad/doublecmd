@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    This unit contains Unix specific functions
 
-   Copyright (C) 2015-2022 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2015-2023 Alexander Koblov (alexx2000@mail.ru)
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -18,6 +18,11 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
+
+   Notes:
+   1. TDarwinStat64 is the workaround for the bug of BaseUnix.Stat in FPC.
+      on MacOS with x86_64, Stat64 should be used instead of Stat.
+      and lstat64() should be called instead of lstat().
 }
 
 unit DCUnix;
@@ -28,7 +33,7 @@ unit DCUnix;
 interface
 
 uses
-  InitC, BaseUnix, SysUtils;
+  InitC, BaseUnix, UnixType, SysUtils;
 
 const
 {$IF DEFINED(LINUX)}
@@ -38,6 +43,9 @@ const
   O_CLOEXEC  = &04000000;
 {$ELSEIF DEFINED(NETBSD)}
   O_CLOEXEC  = $00400000;
+{$ELSEIF DEFINED(HAIKU)}
+  FD_CLOEXEC = 1;
+  O_CLOEXEC  = $00000040;
 {$ELSE}
   O_CLOEXEC  = 0;
 {$ENDIF}
@@ -90,9 +98,14 @@ type
     pw_change: time_t; //en< password change time
     pw_class: PChar;   //en< user access class
 {$ENDIF}
+{$IF NOT DEFINED(HAIKU)}
     pw_gecos: PChar;   //en< real name
+{$ENDIF}
     pw_dir: PChar;     //en< home directory
     pw_shell: PChar;   //en< shell program
+{$IF DEFINED(HAIKU)}
+    pw_gecos: PChar;   //en< real name
+{$ENDIF}
 {$IF DEFINED(BSD)}
     pw_expire: time_t; //en< account expiration
     pw_fields: cint;   //en< internal: fields filled in
@@ -109,6 +122,41 @@ type
   end;
   TGroupRecord = group;
   PGroupRecord = ^TGroupRecord;
+
+type
+{$IF DEFINED(DARWIN)}
+  TDarwinStat64 = record { the types are real}
+       st_dev        : dev_t;             // inode's device
+       st_mode       : mode_t;            // inode protection mode
+       st_nlink      : nlink_t;           // number of hard links
+       st_ino        : cuint64;           // inode's number
+       st_uid        : uid_t;             // user ID of the file's owner
+       st_gid        : gid_t;             // group ID of the file's group
+       st_rdev       : dev_t;             // device type
+       st_atime      : time_t;            // time of last access
+       st_atimensec  : clong;             // nsec of last access
+       st_mtime      : time_t;            // time of last data modification
+       st_mtimensec  : clong;             // nsec of last data modification
+       st_ctime      : time_t;            // time of last file status change
+       st_ctimensec  : clong;             // nsec of last file status change
+       st_birthtime  : time_t;            // File creation time
+       st_birthtimensec : clong;          // nsec of file creation time
+       st_size       : off_t;             // file size, in bytes
+       st_blocks     : cint64;            // blocks allocated for file
+       st_blksize    : cuint32;           // optimal blocksize for I/O
+       st_flags      : cuint32;           // user defined flags for file
+       st_gen        : cuint32;           // file generation number
+       st_lspare     : cint32;
+       st_qspare     : array[0..1] Of cint64;
+  end;
+
+  TDCStat = TDarwinStat64;
+{$ELSE}
+  TDCStat = BaseUnix.Stat;
+{$ENDIF}
+
+Function DC_fpLstat( const path:RawByteString; var Info:TDCStat ): cint; inline;
+
 
 {en
    Set the close-on-exec flag to all
@@ -145,6 +193,12 @@ function getenv(name: PAnsiChar): PAnsiChar; cdecl; external clib;
             insufficient space in the environment)
 }
 function setenv(const name, value: PAnsiChar; overwrite: cint): cint; cdecl; external clib;
+{en
+   Remove an environment variable
+   @param(name Environment variable name)
+   @returns(The function returns zero on success, or -1 on error)
+}
+function unsetenv(const name: PAnsiChar): cint; cdecl; external clib;
 {en
    Get password file entry
    @param(uid User ID)
@@ -197,6 +251,30 @@ implementation
 uses
   Unix, DCConvertEncoding;
 
+
+{$IF DEFINED(DARWIN)}
+
+Function fpLstat64( path:pchar; Info:pstat ): cint; cdecl; external clib name 'lstat64';
+
+Function DC_fpLstat( const path:RawByteString; var Info:TDCStat ): cint; inline;
+var
+  SystemPath: RawByteString;
+begin
+  SystemPath:=ToSingleByteFileSystemEncodedFileName( path );
+  Result:= fpLstat64( pchar(SystemPath), @info );
+end;
+
+{$ELSE}
+
+Function DC_fpLstat( const path:RawByteString; var Info:TDCStat ): cint; inline;
+begin
+  fpLstat( path, info );
+end;
+
+{$ENDIF}
+
+
+
 {$IF DEFINED(BSD)}
 type rlim_t = Int64;
 {$ENDIF}
@@ -209,6 +287,10 @@ const
   {$ELSEIF DEFINED(BSD)}
   _SC_OPEN_MAX  = 5;
   RLIM_INFINITY = rlim_t(High(QWord) shr 1);
+  {$ELSEIF DEFINED(HAIKU)}
+  _SC_OPEN_MAX  = 20;
+  RLIMIT_NOFILE = 4;
+  RLIM_INFINITY = $ffffffff;
   {$ENDIF}
 
 procedure tzset(); cdecl; external clib;

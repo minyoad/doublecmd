@@ -20,7 +20,6 @@ type
     procedure cbExtendedChange(Sender: TObject);
     procedure cbMkDirChange(Sender: TObject);
     procedure cbMkDirKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure FormKeyPress(Sender: TObject; var Key: Char);
     procedure RefreshExample;
   public
 
@@ -61,32 +60,18 @@ begin
   Result := Result + sMask;
 end;
 
-procedure TfrmMkDir.FormKeyPress(Sender: TObject; var Key: Char);
-begin
-  if Key = #27 then
-  begin
-    ModalResult:= mrCancel;
-    Key := #0;
-  end
-  else if Key = #13 then
-  begin
-    ModalResult:= mrOK;
-    Key:= #0;
-  end;
-end;
-
 procedure TfrmMkDir.RefreshExample;
 var
   sPath: String;
 begin
   if not cbExtended.Checked then
-    lblExample.Caption:= EmptyStr
+    lblExample.Caption:= ' '
   else begin
     sPath:= TrimPath(cbMkDir.Text);
     if StrBegins(sPath, '<') then
       lblExample.Caption:= sReplace(Copy(sPath, 2, MaxInt))
     else
-      lblExample.Caption:= EmptyStr
+      lblExample.Caption:= ' '
   end;
 end;
 
@@ -126,6 +111,7 @@ begin
     else begin
       cbMkDir.Text := '';
     end;
+    RefreshExample;
     cbMkDir.SelectAll;
     Result := (ShowModal = mrOK);
     if Result then

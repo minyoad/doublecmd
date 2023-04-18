@@ -628,9 +628,9 @@ begin
     chkDeleteLeft.Caption := Format(rsDeleteLeft, [DeleteLeftCount]);
     chkDeleteRight.Caption := Format(rsDeleteRight, [DeleteRightCount]);
     chkLeftToRight.Caption :=
-      Format(rsLeftToRightCopy, [CopyRightCount, cnvFormatFileSize(CopyRightSize, fsfFloat, gFileSizeDigits), Numb2USA(IntToStr(CopyRightSize))]);
+      Format(rsLeftToRightCopy, [CopyRightCount, cnvFormatFileSize(CopyRightSize, fsfFloat, gFileSizeDigits), IntToStrTS(CopyRightSize)]);
     chkRightToLeft.Caption :=
-      Format(rsRightToLeftCopy, [CopyLeftCount, cnvFormatFileSize(CopyLeftSize, fsfFloat, gFileSizeDigits), Numb2USA(IntToStr(CopyLeftSize))]);
+      Format(rsRightToLeftCopy, [CopyLeftCount, cnvFormatFileSize(CopyLeftSize, fsfFloat, gFileSizeDigits), IntToStrTS(CopyLeftSize)]);
     if ShowModal = mrOk then
     begin
       EnableControls(False);
@@ -1244,14 +1244,14 @@ var
         for i := 0 to fs.Count - 1 do
         begin
           f := fs.Items[i];
-          if (Template = nil) or Template.CheckFile(f) then
+          if f.IsDirectory then
           begin
-            if f.IsDirectory then
-            begin
-              if (f.NameNoExt <> '.') and (f.NameNoExt <> '..') then
-                dirs.Add(f.Name);
-            end
-            else if ((MaskList = nil) or MaskList.Matches(f.Name)) then
+            if (f.NameNoExt <> '.') and (f.NameNoExt <> '..') then
+              dirs.Add(f.Name);
+          end
+          else if (Template = nil) or Template.CheckFile(f) then
+          begin
+            if ((MaskList = nil) or MaskList.Matches(f.Name)) then
             begin
               j := it.IndexOf(f.Name);
               if j < 0 then
@@ -1840,7 +1840,7 @@ var
   BarText : String;
   CaptionText : String;
 begin
-  BarText := cnvFormatFileSize(CurrentFiles, uoscNoUnit) + '/' + cnvFormatFileSize(TotalFiles, uoscNoUnit);
+  BarText := IntToStrTS(CurrentFiles) + '/' + IntToStrTS(TotalFiles);
   AProgressBar.SetProgress(CurrentFiles, TotalFiles, BarText );
 
   {$IFDEF LCLCOCOA}

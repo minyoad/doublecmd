@@ -41,7 +41,7 @@
 
    contributors:
 
-   Copyright (C) 2006-2022 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2006-2023 Alexander Koblov (alexx2000@mail.ru)
 
 
    TODO:
@@ -152,7 +152,9 @@ type
                      veCp950,
                      veIso88591,
                      veIso88592,
-                     veKoi8,
+                     veKoi8r,
+                     veKoi8u,
+                     veKoi8ru,
                      veUcs2le,
                      veUcs2be,
                      veUtf16le,
@@ -189,7 +191,9 @@ const
                     'CP950',
                     'ISO-8859-1',
                     'ISO-8859-2',
-                    'KOI-8',
+                    'KOI8-R',
+                    'KOI8-U',
+                    'KOI8-RU',
                     'UCS-2LE',
                     'UCS-2BE',
                     'UTF-16LE',
@@ -250,6 +254,7 @@ type
     FOnFileOpen:         TFileOpenEvent;
     FCaretVisible:       Boolean;
     FShowCaret:          Boolean;
+    FAutoCopy:           Boolean;
     FLastError:          String;
     FText:               String;
 
@@ -278,7 +283,7 @@ type
     {en
        Returns how many lines (given current FTextHeight) will fit into the window.
     }
-    function GetClientHeightInLines: Integer; inline;
+    function GetClientHeightInLines(Whole: Boolean = True): Integer; inline;
 
     {en
        Calculates how many lines can be displayed from given position.
@@ -516,6 +521,7 @@ type
     property TabSpaces: Integer read FTabSpaces write SetTabSpaces;
     property LeftMargin: Integer read FLeftMargin write FLeftMargin;
     property ExtraLineSpacing: Integer read FExtraLineSpacing write FExtraLineSpacing;
+    property AutoCopy: Boolean read FAutoCopy write FAutoCopy;
     property OnGuessEncoding: TGuessEncodingEvent Read FOnGuessEncoding Write FOnGuessEncoding;
     property OnFileOpen: TFileOpenEvent read FOnFileOpen write FOnFileOpen;
 
@@ -547,7 +553,7 @@ procedure Register;
 implementation
 
 uses
-  LCLType, Graphics, Forms, LCLProc, Clipbrd, LConvEncoding,
+  Math, LCLType, Graphics, Forms, LCLProc, Clipbrd, LConvEncoding,
   DCUnicodeUtils, LCLIntf, LazUTF8, DCOSUtils , DCConvertEncoding
   {$IF DEFINED(UNIX)}
   , BaseUnix, Unix, DCUnix
@@ -618,6 +624,7 @@ begin
   FTabSpaces := 8;
   FLeftMargin := 4;
   FMaxTextWidth := 1024;
+  FAutoCopy := True;
 
   FLineList := TPtrIntList.Create;
 
@@ -880,9 +887,11 @@ procedure TViewerControl.FontChanged(Sender: TObject);
 begin
   inherited FontChanged(Sender);
 
-  Canvas.Font := Self.Font;
-  FTextHeight := Canvas.TextHeight('Wg') + FExtraLineSpacing;
-  if FShowCaret then LCLIntf.CreateCaret(Handle, 0, 2, FTextHeight);
+  if HandleAllocated then
+  begin
+    FTextHeight := Canvas.TextHeight('Wg') + FExtraLineSpacing;
+    if FShowCaret then LCLIntf.CreateCaret(Handle, 0, 2, FTextHeight);
+  end;
 end;
 
 function TViewerControl.CalcTextLineLength(var iStartPos: PtrInt; const aLimit: Int64; out DataLength: PtrInt): Integer;
@@ -1704,7 +1713,7 @@ begin
 
   for xIndex := 0 to FColCount-1 do
   begin
-    for yIndex := 0 to GetClientHeightInLines - 1 do
+    for yIndex := 0 to GetClientHeightInLines(False) - 1 do
     begin
       if iPos >= FHighLimit then
         Break;
@@ -1744,7 +1753,7 @@ var
   s: string;
 begin
   iPos := FPosition;
-  for yIndex := 0 to GetClientHeightInLines - 1 do
+  for yIndex := 0 to GetClientHeightInLines(False) - 1 do
   begin
     if iPos >= FHighLimit then
       Break;
@@ -1764,7 +1773,7 @@ var
   s: string;
 begin
   iPos := FPosition;
-  for yIndex := 0 to GetClientHeightInLines - 1 do
+  for yIndex := 0 to GetClientHeightInLines(False) - 1 do
   begin
     if iPos >= FHighLimit then
       Break;
@@ -1920,10 +1929,15 @@ begin
     end;
 end;
 
-function TViewerControl.GetClientHeightInLines: Integer;
+function TViewerControl.GetClientHeightInLines(Whole: Boolean): Integer;
 begin
   if FTextHeight > 0 then
-    Result := GetViewerRect.Height div FTextHeight
+  begin
+    if Whole then
+      Result := GetViewerRect.Height div FTextHeight
+    else
+      Result := Ceil(GetViewerRect.Height / FTextHeight);
+  end
   else
     Result := 0;
 end;
@@ -2460,7 +2474,8 @@ begin
           if FBlockBeg > FBlockEnd then
             FBlockEnd := FBlockBeg;
 
-          CopyToClipboard;
+          if FAutoCopy then
+            CopyToClipboard;
           Invalidate;
         end;
       end; // mbLeft
@@ -2571,7 +2586,8 @@ begin
 
   if FSelecting and (Button = mbLeft) and (Shift * [ssDouble, ssTriple] = []) then
   begin
-    CopyToClipboard;
+    if FAutoCopy then
+      CopyToClipboard;
     FSelecting := False;
   end;
 end;
@@ -2971,7 +2987,9 @@ begin
     veCp1250..veCp950,
     veIso88591,
     veIso88592,
-    veKoi8:
+    veKoi8r,
+    veKoi8u,
+    veKoi8ru:
       if iPosition < FHighLimit then
       begin
         Result := PByte(GetDataAdr)[iPosition];
@@ -3093,7 +3111,9 @@ begin
     veCp1250..veCp950,
     veIso88591,
     veIso88592,
-    veKoi8:
+    veKoi8r,
+    veKoi8u,
+    veKoi8ru:
       if iPosition > FLowLimit then
       begin
         Result := PByte(GetDataAdr + iPosition)[-1];
@@ -3201,7 +3221,9 @@ begin
     veCp1250..veCp950,
     veIso88591,
     veIso88592,
-    veKoi8:
+    veKoi8r,
+    veKoi8u,
+    veKoi8ru:
       CharLenInBytes := 1;
     veUcs2be, veUcs2le:
       CharLenInBytes := 2;
@@ -3607,7 +3629,9 @@ procedure TViewerControl.UpdateSelection;
       veCp1250..veCp950,
       veIso88591,
       veIso88592,
-      veKoi8:
+      veKoi8r,
+      veKoi8u,
+      veKoi8ru:
         ; // any position allowed
 
       veUcs2be, veUcs2le:

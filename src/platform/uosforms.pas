@@ -3,7 +3,7 @@
     -------------------------------------------------------------------------
     This unit contains platform depended functions.
 
-    Copyright (C) 2006-2018 Alexander Koblov (alexx2000@mail.ru)
+    Copyright (C) 2006-2022 Alexander Koblov (alexx2000@mail.ru)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -108,7 +108,7 @@ procedure ShowTrashContextMenu(Parent: TWinControl; X, Y : Integer;
 }
 function ShowOpenIconDialog(Owner: TCustomControl; var sFileName : String) : Boolean;
 
-{$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+{$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
 {en
    Show open with dialog
    @param(FileList List of files to open with)
@@ -127,27 +127,24 @@ uses
   ExtDlgs, LCLProc, Menus, Graphics, InterfaceBase, WSForms, LMessages, LCLIntf,
   fMain, uConnectionManager, uShowMsg, uLng
   {$IF DEFINED(MSWINDOWS)}
-  , LCLStrConsts, ComObj, DCOSUtils, uOSUtils, uFileSystemFileSource
+  , LCLStrConsts, ComObj, ActiveX, DCOSUtils, uOSUtils, uFileSystemFileSource
   , uTotalCommander, FileUtil, Windows, ShlObj, uShlObjAdditional
-  , uWinNetFileSource, uVfsModule, uMyWindows, DCStrUtils
-  , uDCReadSVG, uFileSourceUtil, uGdiPlusJPEG, uListGetPreviewBitmap
-  , Dialogs, Clipbrd, uDebug, JwaDbt, uThumbnailProvider
-  , uRecycleBinFileSource, uDCReadHEIF, uDCReadWIC
+  , uWinNetFileSource, uVfsModule, uMyWindows, DCStrUtils, uOleDragDrop
+  , uDCReadRSVG, uFileSourceUtil, uGdiPlusJPEG, uListGetPreviewBitmap
+  , Dialogs, Clipbrd, uDebug, JwaDbt, uThumbnailProvider, uShellFolder
+  , uRecycleBinFileSource, uWslFileSource, uDCReadHEIF, uDCReadWIC
     {$IFDEF LCLQT5}
     , qt5, qtwidgets, uDarkStyle
     {$ENDIF}
   {$ENDIF}
   {$IFDEF UNIX}
   , BaseUnix, Errors, fFileProperties, uJpegThumb, uOpenDocThumb
-    {$IF NOT DEFINED(DARWIN)}
-    , uDCReadSVG, uMagickWand, uGio, uGioFileSource, uVfsModule, uVideoThumb
-    , uDCReadWebP, uFolderThumb, uAudioThumb, uDefaultTerminal, uDCReadHEIF
-    , uTrashFileSource
-    {$ELSE}
+    {$IF DEFINED(DARWIN)}
     , MacOSAll, uQuickLook, uMyDarwin
-    {$ENDIF}
-    {$IF NOT DEFINED(DARWIN)}
-    , fOpenWith
+    {$ELSEIF NOT DEFINED(HAIKU)}
+    , uDCReadRSVG, uMagickWand, uGio, uGioFileSource, uVfsModule, uVideoThumb
+    , uDCReadWebP, uFolderThumb, uAudioThumb, uDefaultTerminal, uDCReadHEIF
+    , uTrashFileSource, uFileManager, uFileSystemFileSource, fOpenWith
     {$ENDIF}
     {$IF DEFINED(LCLQT) and not DEFINED(DARWIN)}
     , qt4, qtwidgets
@@ -155,11 +152,14 @@ uses
     {$IF DEFINED(LCLQT5) and not DEFINED(DARWIN)}
     , qt5, qtwidgets
     {$ENDIF}
+    {$IF DEFINED(LCLQT6) and not DEFINED(DARWIN)}
+    , qt6, qtwidgets
+    {$ENDIF}
     {$IF DEFINED(LCLGTK2)}
     , gtk2
     {$ENDIF}
   {$ENDIF}
-  , uTurboJPEG;
+  , uDCReadSVG, uTurboJPEG;
 
 { TAloneForm }
 
@@ -511,7 +511,7 @@ begin
 end;
 {$ENDIF}
 
-{$IF DEFINED(LCLGTK2) or ((DEFINED(LCLQT) or DEFINED(LCLQT5)) and not (DEFINED(DARWIN) or DEFINED(MSWINDOWS)))}
+{$IF DEFINED(LCLGTK2) or ((DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6)) and not (DEFINED(DARWIN) or DEFINED(MSWINDOWS)))}
 
 procedure ScreenFormEvent(Self, Sender: TObject; Form: TCustomForm);
 {$IF DEFINED(LCLGTK2)}
@@ -521,7 +521,7 @@ begin
   ClassName:= Form.ClassName;
   gtk_window_set_role(PGtkWindow(Form.Handle), PAnsiChar(ClassName));
 end;
-{$ELSEIF DEFINED(LCLQT) or DEFINED(LCLQT5)}
+{$ELSEIF DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6)}
 var
   ClassName: WideString;
 begin
@@ -569,10 +569,18 @@ begin
     Screen.AddHandlerFormVisibleChanged(TScreenFormEvent(Handler), True);
   end;
 {$ENDIF}
+  // Register Windows Subsystem for Linux (WSL) file source
+  if CheckWin32Version(10) then
+  begin
+    RegisterVirtualFileSource('Linux', TWslFileSource, TWslFileSource.Available);
+  end;
   // Register network file source
   RegisterVirtualFileSource(rsVfsNetwork, TWinNetFileSource);
+  // Register recycle bin file source
   if CheckWin32Version(5, 1) then
+  begin
     RegisterVirtualFileSource(rsVfsRecycleBin, TRecycleBinFileSource);
+  end;
 
   // If run under administrator
   if (IsUserAdmin = dupAccept) then
@@ -623,7 +631,7 @@ begin
   end;
 end;
 {$ELSE}
-{$IF DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLGTK2) or DEFINED(DARWIN)}
+{$IF DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6) or DEFINED(LCLGTK2) or DEFINED(DARWIN)}
 var
   Handler: TMethod;
 {$ENDIF}
@@ -636,7 +644,7 @@ begin
     with TfrmMain(MainForm) do
       StaticTitle:= StaticTitle + ' - ROOT PRIVILEGES';
   end;
-  {$IF NOT DEFINED(DARWIN)}
+  {$IF NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
   if HasGio then
   begin
     if TGioFileSource.IsSupportedPath('trash://') then
@@ -650,7 +658,7 @@ begin
   Handler.Data:= MainForm;
   Handler.Code:= @ActiveFormChangedHandler;
   Screen.AddHandlerActiveFormChanged(TScreenFormEvent(Handler), True);
-  {$ELSEIF DEFINED(LCLGTK2) or DEFINED(LCLQT) or DEFINED(LCLQT5)}
+  {$ELSEIF DEFINED(LCLGTK2) or DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6)}
   Handler.Data:= MainForm;
   Handler.Code:= @ScreenFormEvent;
   ScreenFormEvent(MainForm, MainForm, MainForm);
@@ -714,7 +722,11 @@ begin
   ShellContextMenu:= TShellContextMenu.Create(nil, Files, Background, UserWishForContextMenu);
   ShellContextMenu.OnClose := CloseEvent;
   // Show context menu
+  {$IF DEFINED(DARWIN)}
+  MacosServiceMenuHelper.PopUp( ShellContextMenu, uLng.rsMenuMacOsServices );
+  {$ELSE}
   ShellContextMenu.PopUp(X, Y);
+  {$ENDIF}
 end;
 {$ENDIF}
 
@@ -771,34 +783,51 @@ end;
 procedure ShowFilePropertiesDialog(aFileSource: IFileSource; const Files: TFiles);
 {$IFDEF UNIX}
 begin
+{$IF NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
+  if gSystemItemProperties and aFileSource.IsClass(TFileSystemFileSource) then
+  begin
+   if ShowItemProperties(Files) then Exit;
+  end;
+{$ENDIF}
   ShowFileProperties(aFileSource, Files);
 end;
 {$ELSE}
 var
-  cmici: TCMINVOKECOMMANDINFO;
+  Index: Integer;
   contMenu: IContextMenu;
+  cmici: TCMInvokeCommandInfo;
+  DataObject: THDropDataObject;
 begin
   if Files.Count = 0 then Exit;
 
   try
-    contMenu := GetShellContextMenu(frmMain.Handle, Files, False);
-    if Assigned(contMenu) then
+    if CheckWin32Version(5, 1) then
     begin
-      FillChar(cmici, sizeof(cmici), #0);
-      with cmici do
+      DataObject:= THDropDataObject.Create(DROPEFFECT_NONE);
+      for Index:= 0 to Files.Count - 1 do
+      begin
+        DataObject.Add(Files[Index].FullPath);
+      end;
+      OleCheckUTF8(MultiFileProperties(DataObject, 0));
+    end
+    else begin
+      contMenu := GetShellContextMenu(frmMain.Handle, Files, False);
+      if Assigned(contMenu) then
+      begin
+        cmici:= Default(TCMInvokeCommandInfo);
+        with cmici do
         begin
-          cbSize := sizeof(cmici);
+          cbSize := SizeOf(TCMInvokeCommandInfo);
           hwnd := frmMain.Handle;
           lpVerb := sCmdVerbProperties;
           nShow := SW_SHOWNORMAL;
         end;
-
-      OleCheckUTF8(contMenu.InvokeCommand(cmici));
+        OleCheckUTF8(contMenu.InvokeCommand(cmici));
+      end;
     end;
-
   except
-    on e: EOleError do
-      raise EContextMenuException.Create(e.Message);
+    on E: EOleError do
+      raise EContextMenuException.Create(E.Message);
   end;
 end;
 {$ENDIF}
@@ -926,7 +955,7 @@ begin
 end;
 {$ENDIF}
 
-{$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+{$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
 procedure ShowOpenWithDialog(TheOwner: TComponent; const FileList: TStringList);
 begin
   fOpenWith.ShowOpenWithDlg(TheOwner, FileList);

@@ -29,7 +29,7 @@ unit uWCXmodule;
 interface
 
 uses
-  LCLType, Classes, Dialogs, LazUTF8Classes, dynlibs, SysUtils,
+  LCLType, Classes, Dialogs, LazUTF8Classes, dynlibs, SysUtils, uExtension,
   uWCXprototypes, WcxPlugin, Extension, DCBasicTypes, DCXmlConfig, uClassesEx;
 
 Type
@@ -75,9 +75,9 @@ Type
   
   { TWcxModule }
 
-  TWcxModule = class
+  TWcxModule = class(TDcxModule)
   private
-    FModuleHandle: TLibHandle;  // Handle to .DLL or .so
+    FModuleName: String;
     FBackgroundFlags: Integer;
 
   public
@@ -145,6 +145,7 @@ Type
 
     function IsLoaded: Boolean;
 
+    property ModuleName: String read FModuleName;
     property BackgroundFlags: Integer read FBackgroundFlags write FBackgroundFlags;
   end;
 
@@ -252,6 +253,7 @@ begin
     //------------------------------------------------------
     UnloadModule;
   end;
+  inherited Destroy;
 end;
 
 function TWcxModule.OpenArchiveHandle(FileName: String; anOpenMode: Longint; out OpenResult: Longint): TArcHandle;
@@ -394,10 +396,12 @@ end;
 
 function TWcxModule.LoadModule(const sName:String):Boolean;
 var
-  PackDefaultParamStruct : TPackDefaultParamStruct;
   StartupInfo: TExtensionStartupInfo;
+  PackDefaultParamStruct : TPackDefaultParamStruct;
 begin
-  FModuleHandle := mbLoadLibrary(mbExpandFileName(sName));
+  FModuleName := ExtractFileName(sName);
+  FModulePath := mbExpandFileName(sName);
+  FModuleHandle := mbLoadLibrary(FModulePath);
   if FModuleHandle = 0 then Exit(False);
 
   DCDebug('WCX module loaded ' + sName + ' at ' + hexStr(Pointer(FModuleHandle)));
@@ -476,24 +480,11 @@ begin
 
   // Extension API
   if Assigned(ExtensionInitialize) then
-    begin
-      FillByte(StartupInfo, SizeOf(TExtensionStartupInfo), 0);
+  begin
+    InitializeExtension(@StartupInfo);
 
-      with StartupInfo do
-      begin
-        StructSize:= SizeOf(TExtensionStartupInfo);
-        PluginDir:= ExtractFilePath(mbExpandFileName(sName));
-        PluginConfDir:= gpCfgDir;
-        InputBox:= @fDialogBox.InputBox;
-        MessageBox:= @fDialogBox.MessageBox;
-        DialogBoxLFM:= @fDialogBox.DialogBoxLFM;
-        DialogBoxLRS:= @fDialogBox.DialogBoxLRS;
-        DialogBoxLFMFile:= @fDialogBox.DialogBoxLFMFile;
-        SendDlgMsg:= @fDialogBox.SendDlgMsg;
-      end;
-
-      ExtensionInitialize(@StartupInfo);
-    end;
+    ExtensionInitialize(@StartupInfo);
+  end;
 end;
 
 procedure TWcxModule.UnloadModule;

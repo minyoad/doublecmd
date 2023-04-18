@@ -59,7 +59,7 @@ type
     function GetArcFileList: TThreadObjectList;
 
   protected
-
+    function GetPacker: String; override;
     function GetSupportedFileProperties: TFilePropertiesTypes; override;
     function SetCurrentWorkingDirectory(NewDir: String): Boolean; override;
 
@@ -284,7 +284,9 @@ begin
       Comment,
   }
     SizeProperty := TFileSizeProperty.Create(ArchiveItem.UnpSize);
+    SizeProperty.IsValid := (ArchiveItem.UnpSize >= 0);
     CompressedSizeProperty := TFileCompressedSizeProperty.Create(ArchiveItem.PackSize);
+    CompressedSizeProperty.IsValid := (ArchiveItem.PackSize >= 0);
 
     if (FormMode and MAF_UNIX_ATTR) <> 0 then
       AttributesProperty := TUnixFileAttributesProperty.Create(ArchiveItem.Attributes)
@@ -298,7 +300,7 @@ begin
       with ArchiveItem do
         ModificationTime := EncodeDate(Year, Month, Day) + EncodeTime(Hour, Minute, Second, 0);
     except
-      on EConvertError do;
+      on EConvertError do ModificationTimeProperty.IsValid:= False;
     end;
 
     if AttributesProperty.IsLink and (Length(ArchiveItem.FileLink) > 0) then
@@ -504,6 +506,11 @@ begin
   //****************************************************************************
 
   FArcFileList.Add(ArchiveItem);
+end;
+
+function TMultiArchiveFileSource.GetPacker: String;
+begin
+  Result:= FMultiArcItem.FPacker;
 end;
 
 function TMultiArchiveFileSource.GetPassword: String;

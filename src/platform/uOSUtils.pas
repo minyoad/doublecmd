@@ -3,7 +3,7 @@
     -------------------------------------------------------------------------
     This unit contains platform depended functions.
 
-    Copyright (C) 2006-2022 Alexander Koblov (alexx2000@mail.ru)
+    Copyright (C) 2006-2023 Alexander Koblov (alexx2000@mail.ru)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -56,7 +56,7 @@ const
   {$ELSEIF DEFINED(UNIX)}
   faFolder = S_IFDIR;
   ReversePathDelim = '\';
-  {$IFDEF DARWIN)}
+  {$IF DEFINED(DARWIN)}
   RunTermCmd = '/Applications/Utilities/Terminal.app';  // default terminal
   RunTermParams = '%D';
   RunInTermStayOpenCmd = '%COMMANDER_PATH%/scripts/terminal.sh'; // default run in terminal command AND Stay open after command
@@ -64,6 +64,14 @@ const
   RunInTermCloseCmd = ''; // default run in terminal command AND Close after command
   RunInTermCloseParams = '';
   MonoSpaceFont = 'Monaco';
+  {$ELSEIF DEFINED(HAIKU)}
+  RunTermCmd: String = 'Terminal';  // default terminal
+  RunTermParams: String = '-w %D';
+  RunInTermStayOpenCmd: String = ''; // default run in terminal command AND Stay open after command
+  RunInTermStayOpenParams: String = '';
+  RunInTermCloseCmd: String = ''; // default run in terminal command AND Close after command
+  RunInTermCloseParams: String = '';
+  MonoSpaceFont = 'Noto Sans Mono';
   {$ELSE}
   RunTermCmd: String = 'xterm';  // default terminal
   RunTermParams: String = '';
@@ -193,8 +201,11 @@ uses
   , BaseUnix, Unix, uMyUnix, dl
     {$IF DEFINED(DARWIN)}
   , CocoaAll, uMyDarwin
-    {$ELSE}
+    {$ELSEIF NOT DEFINED(HAIKU)}
   , uGio, uClipboard, uXdg, uKde
+    {$ENDIF}
+    {$IF DEFINED(LINUX)}
+  , DCUnix, uMyLinux
     {$ENDIF}
   {$ENDIF}
   ;
@@ -406,32 +417,38 @@ var
 begin
   Result:= False;
   sCmdLine:= EmptyStr;
+
   if FileIsUnixExecutable(URL) then
-    begin
-      if GetPathType(URL) <> ptAbsolute then
-        sCmdLine := './';
-      sCmdLine:= sCmdLine + QuoteStr(URL);
-    end
-  else
-    begin
-      if (DesktopEnv = DE_KDE) and (HasKdeOpen = True) then
-        Result:= KioOpen(URL) // Under KDE use "kioclient" to open files
-      else if HasGio and (DesktopEnv <> DE_XFCE) then
-        Result:= GioOpen(URL) // Under GNOME, Unity and LXDE use "GIO" to open files
-      else
-        begin
-          if GetPathType(URL) = ptAbsolute then
-            sCmdLine:= URL
-          else
-            begin
-              sCmdLine := IncludeTrailingPathDelimiter(mbGetCurrentDir);
-              sCmdLine:= GetAbsoluteFileName(sCmdLine, URL)
-            end;
-          sCmdLine:= GetDefaultAppCmd(sCmdLine);
-        end;
+  begin
+    if GetPathType(URL) = ptAbsolute then
+      sCmdLine:= URL
+    else begin
+      sCmdLine:= IncludeTrailingPathDelimiter(mbGetCurrentDir);
+      sCmdLine:= GetAbsoluteFileName(sCmdLine, URL)
     end;
-  if Length(sCmdLine) <> 0 then
+  end
+  else begin
+  {$IF NOT DEFINED(HAIKU)}
+    if (DesktopEnv = DE_KDE) and (HasKdeOpen = True) then
+      Result:= KioOpen(URL) // Under KDE use "kioclient" to open files
+    else if HasGio and (DesktopEnv <> DE_XFCE) then
+      Result:= GioOpen(URL) // Under GNOME, Unity and LXDE use "GIO" to open files
+    else
+  {$ENDIF}
+    begin
+      if GetPathType(URL) = ptAbsolute then
+        sCmdLine:= URL
+      else begin
+        sCmdLine:= IncludeTrailingPathDelimiter(mbGetCurrentDir);
+        sCmdLine:= GetAbsoluteFileName(sCmdLine, URL)
+      end;
+      sCmdLine:= GetDefaultAppCmd(sCmdLine);
+    end;
+  end;
+
+  if Length(sCmdLine) > 0 then begin
     Result:= ExecCmdFork(sCmdLine);
+  end;
 end;
 {$ENDIF}
 
@@ -444,6 +461,12 @@ var
 begin
   Result:= (fpStatFS(PAnsiChar(CeUtf8ToSys(Path)), @sbfs) = 0);
   if not Result then Exit;
+{$IFDEF LINUX}
+  if (sbfs.fstype = RAMFS_MAGIC) then
+  begin
+    Exit(GetFreeMem(FreeSize, TotalSize));
+  end;
+{$ENDIF}
   FreeSize := (Int64(sbfs.bavail) * sbfs.bsize);
   TotalSize := (Int64(sbfs.blocks) * sbfs.bsize);
 end;
@@ -466,6 +489,7 @@ var
   sbfs: TStatFS;
 begin
   Result := High(Int64);
+{$IF NOT DEFINED(HAIKU)}
   if (fpStatFS(PAnsiChar(CeUtf8ToSys(Path)), @sbfs) = 0) then
   begin
     {$IFDEF BSD}
@@ -475,6 +499,7 @@ begin
     {$ENDIF}
       Result:= $FFFFFFFF; // 4 Gb
   end;
+{$ENDIF}
 end;
 {$ELSE}
 var

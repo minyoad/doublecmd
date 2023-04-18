@@ -92,6 +92,13 @@ type
     FFileExistsOption: TFileSourceOperationOptionFileExists;
     FDirExistsOption: TFileSourceOperationOptionDirectoryExists;
 
+{$IF DEFINED(LINUX)}
+    FCache: record
+      Device: QWord;
+      DirtyLimit: Int64
+    end;
+{$ENDIF}
+
     FCurrentFile: TFile;
     FCurrentTargetFilePath: String;
 
@@ -167,11 +174,11 @@ type
 implementation
 
 uses
-  uDebug, uOSUtils, DCStrUtils, FileUtil, uFindEx, DCClassesUtf8, uFileProcs, uLng,
+  uDebug, uDCUtils, uOSUtils, DCStrUtils, FileUtil, uFindEx, DCClassesUtf8, uFileProcs, uLng,
   DCBasicTypes, uFileSource, uFileSystemFileSource, uFileProperty, uAdministrator,
   StrUtils, DCDateTimeUtils, uShowMsg, Forms, LazUTF8, uHash, uFileCopyEx, SysConst
 {$IFDEF UNIX}
-  , BaseUnix, DCUnix
+  , BaseUnix, Unix, DCUnix
 {$ENDIF}
   ;
 
@@ -280,11 +287,11 @@ begin
   Result:= rsMsgFileExistsOverwrite + LineEnding + WrapTextSimple(TargetName, 100) + LineEnding;
   if FileGetAttrUAC(TargetName, TargetInfo) then
   begin
-    Result:= Result + Format(rsMsgFileExistsFileInfo, [Numb2USA(IntToStr(TargetInfo.Size)),
+    Result:= Result + Format(rsMsgFileExistsFileInfo, [IntToStrTS(TargetInfo.Size),
                              DateTimeToStr(FileTimeToDateTime(TargetInfo.LastWriteTime))]) + LineEnding;
   end;
   Result:= Result + LineEnding + rsMsgFileExistsWithFile + LineEnding + WrapTextSimple(SourceName, 100) + LineEnding +
-           Format(rsMsgFileExistsFileInfo, [Numb2USA(IntToStr(SourceSize)), DateTimeToStr(SourceTime)]);
+           Format(rsMsgFileExistsFileInfo, [IntToStrTS(SourceSize), DateTimeToStr(SourceTime)]);
 end;
 
 function FileCopyProgress(TotalBytes, DoneBytes: Int64; UserData: Pointer): LongBool;
@@ -503,6 +510,10 @@ var
   Options: UInt32;
   Context: THashContext;
   bDeleteFile: Boolean = False;
+{$IFDEF LINUX}
+  Sbfs: TStatFS;
+  Info: BaseUnix.Stat;
+{$ENDIF}
 
   procedure OpenSourceFile;
   var
@@ -748,6 +759,25 @@ begin
       if not Assigned(TargetFileStream) then
         Exit;
 
+{$IF DEFINED(LINUX)}
+      if not FVerify and (fpFStatFS(TargetFileStream.Handle, @Sbfs) = 0) then
+      begin
+        case UInt32(Sbfs.fstype) of
+          NFS_SUPER_MAGIC:
+          begin
+            TargetFileStream.AutoSync:= True;
+            if (fpFStat(TargetFileStream.Handle, Info) = 0) then
+            begin
+              if FCache.Device = QWord(Info.st_dev) then
+                TargetFileStream.DirtyLimit:= FCache.DirtyLimit
+              else
+                FCache.Device:= QWord(Info.st_dev);
+            end;
+          end;
+        end;
+      end;
+{$ENDIF}
+
       while TotalBytesToRead > 0 do
       begin
         // Without the following line the reading is very slow
@@ -886,6 +916,10 @@ begin
     if FVerify then Context.Free;
     if Assigned(TargetFileStream) then
     begin
+{$IF DEFINED(LINUX)}
+      if TargetFileStream.AutoSync then
+        FCache.DirtyLimit:= TargetFileStream.DirtyLimit;
+{$ENDIF}
       FreeAndNil(TargetFileStream);
       if TotalBytesToRead > 0 then
       begin
@@ -1620,14 +1654,16 @@ function TFileSystemOperationHelper.FileExists(aFile: TFile;
   ): TFileSourceOperationOptionFileExists;
 const
   Responses: array[0..13] of TFileSourceOperationUIResponse
-    = (fsourOverwrite, fsourSkip, fsourRenameSource, fsourOverwriteAll,
-       fsourSkipAll, fsourResume, fsourOverwriteOlder, fsourCancel,
-       fsouaCompare, fsourAppend, fsourOverwriteSmaller, fsourOverwriteLarger,
+    = (fsourOverwrite, fsourSkip, fsourRenameSource,
+       fsourOverwriteAll, fsourSkipAll, fsourResume,
+       fsourOverwriteOlder, fsourCancel, fsouaCompare,
+       fsourAppend, fsourOverwriteSmaller, fsourOverwriteLarger,
        fsourAutoRenameSource, fsourAutoRenameTarget);
   ResponsesNoAppend: array[0..11] of TFileSourceOperationUIResponse
-    = (fsourOverwrite, fsourSkip, fsourRenameSource,  fsourOverwriteAll,
-       fsourSkipAll, fsourOverwriteSmaller, fsourOverwriteOlder, fsourCancel,
-       fsouaCompare, fsourOverwriteLarger, fsourAutoRenameSource, fsourAutoRenameTarget);
+    = (fsourOverwrite, fsourSkip, fsourRenameSource,
+       fsourOverwriteAll, fsourSkipAll, fsouaCompare,
+       fsourOverwriteOlder, fsourCancel, fsourOverwriteSmaller,
+       fsourOverwriteLarger, fsourAutoRenameSource, fsourAutoRenameTarget);
 var
   Answer: Boolean;
   Message: String;

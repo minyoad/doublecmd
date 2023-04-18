@@ -43,15 +43,15 @@ interface
 
 uses
   Classes, SysUtils, Graphics, syncobjs, uFileSorting, DCStringHashListUtf8,
-  uFile, uIconTheme, uDrive, uDisplayFile, uGlobs, uDCReadPSD, uOSUtils
-  {$IF NOT DEFINED(DARWIN)}
-  , uDCReadSVG
-  {$ENDIF}
+  uFile, uIconTheme, uDrive, uDisplayFile, uGlobs, uDCReadPSD, uOSUtils,
+  uVectorImage
   {$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
   , fgl
   {$ELSEIF DEFINED(UNIX)}
   , DCFileAttributes
-    {$IF NOT DEFINED(DARWIN)}
+    {$IF DEFINED(DARWIN)}
+    , CocoaUtils, uMyDarwin
+    {$ELSEIF NOT DEFINED(HAIKU)}
     , Contnrs, uGio
       {$IFDEF LCLGTK2}
       , gtk2
@@ -124,7 +124,7 @@ type
     FOneDrivePath: String;
     {$ELSEIF DEFINED(DARWIN)}
     FUseSystemTheme: Boolean;
-    {$ELSEIF DEFINED(UNIX)}
+    {$ELSEIF DEFINED(UNIX) AND NOT DEFINED(HAIKU)}
     {en
        Maps file extension to MIME icon name(s).
     }
@@ -203,7 +203,7 @@ type
     function GetSystemArchiveIcon: PtrInt;
     function GetSystemExecutableIcon: PtrInt;
   {$ENDIF}
-  {$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+  {$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
     {en
        Loads MIME icons names and creates a mapping: file extension -> MIME icon name.
        Doesn't need to be synchronized as long as it's only called from Load().
@@ -224,10 +224,11 @@ type
   {$IF DEFINED(DARWIN)}
     function GetSystemFolderIcon: PtrInt;
     function GetMimeIcon(AFileExt: String; AIconSize: Integer): PtrInt;
+    function LoadImageFileBitmap( const filename:String; const size:Integer ): TBitmap;
   {$ENDIF}
     function GetBuiltInDriveIcon(Drive : PDrive; IconSize : Integer; clBackColor : TColor) : Graphics.TBitmap;
 
-{$IF NOT DEFINED(DARWIN)}
+{$IF NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
     procedure LoadApplicationThemeIcon;
 {$ENDIF}
 
@@ -656,15 +657,22 @@ begin
             else
               DCDebug(Format('Error: pixmap [%s] not loaded!', [AIconName]));
         {$ELSE}
+            {$IFDEF DARWIN}
+            bmpBitmap := LoadImageFileBitmap(AIconName, AIconSize);
+            {$ELSE}
             bmpBitmap := LoadBitmapEnhanced(AIconName, AIconSize, False, clNone, nil);
+            {$ENDIF}
             if Assigned(bmpBitmap) then
             begin
+              // MacOS' high resolution screen parameters are different from other operating systems
+              {$IF NOT DEFINED(DARWIN)}
               // Shrink big bitmaps before putting them into PixmapManager,
               // to speed up later drawing.
               if (bmpBitmap.Width > 48) or (bmpBitmap.Height > 48) then
               begin
                 bmpBitmap := StretchBitmap(bmpBitmap, AIconSize, clBlack, True);
               end;
+              {$ENDIF}
               Result := FPixmapList.Add(bmpBitmap);
               FPixmapsFileNames.Add(AIconName, Pointer(Result));
             end;
@@ -688,7 +696,7 @@ procedure TPixMapManager.CreateIconTheme;
 var
   DirList: array of string;
 begin
-{$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+{$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
   {$IFDEF LCLGTK2}
   // get current gtk theme
   FIconTheme:= gtk_icon_theme_get_for_screen(gdk_screen_get_default);
@@ -713,7 +721,7 @@ end;
 
 procedure TPixMapManager.DestroyIconTheme;
 begin
-{$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+{$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
   {$IFDEF LCLGTK2}
   FIconTheme:= nil;
   {$ELSE}
@@ -724,7 +732,7 @@ begin
   FreeThenNil(FDCIconTheme);
 end;
 
-{$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+{$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
 
 procedure TPixMapManager.LoadMimeIconNames;
 const
@@ -940,35 +948,103 @@ end;
 
 {$ELSEIF DEFINED(DARWIN)}
 
+function getAppIconFilename( appName: String ) : String;
+var
+  appBundle : NSBundle;
+  infoDict : NSDictionary;
+  iconTag : NSString;
+begin
+  Result := '';
+  appBundle := NSBundle.bundleWithPath( StringToNSString(appName) );
+  if appBundle=nil then exit;
+  infoDict := appBundle.infoDictionary;
+  if infoDict=nil then exit;
+  iconTag := NSString( infoDict.valueForKey( StringToNSString('CFBundleIconFile')) );
+  Result := NSStringToString( appBundle.pathForImageResource( iconTag ) );
+end;
+
+function getBestNSImageWithSize( const srcImage:NSImage; const size:Integer ): NSImage;
+var
+  bestRect: NSRect;
+  bestImageRep: NSImageRep;
+  bestImage: NSImage;
+begin
+  Result := nil;
+  if srcImage=nil then exit;
+
+  bestRect.origin.x := 0;
+  bestRect.origin.y := 0;
+  bestRect.size.width := size;
+  bestRect.size.height := size;
+  bestImageRep:= srcImage.bestRepresentationForRect_context_hints( bestRect, nil, nil );
+
+  bestImage:= NSImage.Alloc.InitWithSize( bestImageRep.size );
+  bestImage.AddRepresentation( bestImageRep );
+
+  Result := bestImage;
+end;
+
+function getImageFileBestNSImage( const filename:NSString; const size:Integer ): NSImage;
+var
+  srcImage: NSImage;
+begin
+  Result:= nil;
+  try
+    srcImage:= NSImage.Alloc.initByReferencingFile( filename );
+    Result:= getBestNSImageWithSize( srcImage, size );
+  finally
+    if Assigned(srcImage) then srcImage.release;
+  end;
+end;
+
+function NSImageToTBitmap( const image:NSImage ): TBitmap;
+var
+  tempData: NSData;
+  tempStream: TBlobStream;
+  tempBitmap: TTiffImage;
+  bitmap: TBitmap;
+begin
+  Result:= nil;
+  if image=nil then exit;
+
+  tempStream:= nil;
+  tempBitmap:= nil;
+  try
+    tempData:= image.TIFFRepresentation;
+    tempStream:= TBlobStream.Create( tempData.Bytes, tempData.Length );
+    tempBitmap:= TTiffImage.Create;
+    tempBitmap.LoadFromStream( tempStream );
+    bitmap:= TBitmap.Create;
+    bitmap.Assign( tempBitmap );
+    Result:= bitmap;
+  finally
+    FreeAndNil(tempBitmap);
+    FreeAndNil(tempStream);
+  end;
+end;
+
+function TPixMapManager.LoadImageFileBitmap( const filename:String; const size:Integer ): TBitmap;
+var
+  image: NSImage;
+begin
+  Result:= nil;
+  image:= nil;
+  try
+    image:= getImageFileBestNSImage( StringToNSString(filename), size );
+    if Assigned(image) then Result:= NSImageToTBitmap( image );
+  finally
+    if Assigned(image) then image.release;
+  end;
+end;
+
 function TPixMapManager.GetApplicationBundleIcon(sFileName: String;
   iDefaultIcon: PtrInt): PtrInt;
 var
-  I, J: PtrInt;
-  slInfoFile: TStringListEx = nil;
-  sTemp,
+  I: PtrInt;
   sIconName: String;
 begin
   Result:= iDefaultIcon;
-  slInfoFile:= TStringListEx.Create;
-  try
-    try
-      slInfoFile.LoadFromFile(sFileName + '/Contents/Info.plist');
-      sTemp:= slInfoFile.Text;
-      I:= Pos('CFBundleIconFile', sTemp);
-      if I <= 0 then Exit;
-      I:= PosEx('<string>', sTemp, I) + 8;
-      J:= PosEx('</string>', sTemp, I);
-      sIconName:= Copy(sTemp, I, J - I);
-      if not StrEnds(sIconName, '.icns') then
-        sIconName:= sIconName + '.icns';
-      sIconName:= sFileName + '/Contents/Resources/' + sIconName;
-    except
-      Exit;
-    end;
-  finally
-    slInfoFile.Free;
-  end;
-
+  sIconName:= getAppIconFilename(sFileName);
   I:= GetIconByName(sIconName);
   if I >= 0 then Result:= I;
 end;
@@ -1033,11 +1109,9 @@ var
 begin
   FileName:= AIconTheme.FindIcon(AIconName, AIconSize);
   if FileName = EmptyStr then Exit(nil);
-{$IF NOT DEFINED(DARWIN)}
   if TScalableVectorGraphics.IsFileExtensionSupported(ExtractFileExt(FileName)) then
-    Result := BitmapLoadFromScalable(FileName, AIconSize, AIconSize)
+    Result := TScalableVectorGraphics.CreateBitmap(FileName, AIconSize, AIconSize)
   else
-{$ENDIF}
   begin
     Result := CheckLoadPixmapFromFile(FileName);
     if Assigned(Result) then begin
@@ -1054,7 +1128,7 @@ var
 begin
   // This function must be called under FPixmapsLock.
 
-{$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+{$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
   Result := nil;
   // Try to load icon from system theme
   if gShowIcons > sim_standart then
@@ -1347,7 +1421,7 @@ begin
 
   {$IF DEFINED(DARWIN)}
   FUseSystemTheme:= NSAppKitVersionNumber >= 1038;
-  {$ELSEIF DEFINED(UNIX)}
+  {$ELSEIF DEFINED(UNIX) AND NOT DEFINED(HAIKU)}
   FExtToMimeIconName := TFPDataHashTable.Create;
   FHomeFolder := IncludeTrailingBackslash(GetHomeDir);
   {$ENDIF}
@@ -1382,7 +1456,7 @@ destructor TPixMapManager.Destroy;
 var
   I : Integer;
   K: TDriveType;
-{$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+{$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
   J : Integer;
   nodeList: TFPObjectList;
 {$ENDIF}
@@ -1415,7 +1489,7 @@ begin
 
   {$IF DEFINED(MSWINDOWS)}
   ImageList_Destroy(FSysImgList);
-  {$ELSEIF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+  {$ELSEIF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
   for I := 0 to FExtToMimeIconName.HashTable.Count - 1 do
     begin
       nodeList := TFPObjectList(FExtToMimeIconName.HashTable.Items[I]);
@@ -1453,7 +1527,7 @@ begin
   // (via LoadPixMapManager in doublecmd.lpr).
 
   // Load icon themes.
-  {$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+  {$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
   if gShowIcons > sim_standart then
     begin
       LoadMimeIconNames; // For use with GetMimeIcon
@@ -1621,7 +1695,7 @@ begin
 
   (* /Set archive icons *)
 
-{$IF NOT DEFINED(DARWIN)}
+{$IF NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
   LoadApplicationThemeIcon;
 {$ENDIF}
 end;
@@ -1908,7 +1982,7 @@ begin
          // and contains desktop.ini file
          (not (DirectAccess and (IsSysFile or FileIsReadOnly(Attributes)) and mbFileExists(FullPath + '\desktop.ini'))) or
          (ScreenInfo.ColorDepth < 16) then
-      {$ELSEIF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+      {$ELSEIF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
       if (IconsMode = sim_all_and_exe) and (DirectAccess) then
       begin
         if not LoadIcon then Exit(-1);
@@ -1954,7 +2028,7 @@ begin
 
       if (Extension = '') then
       begin
-        {$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+        {$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
         if IconsMode = sim_all_and_exe then
         begin
           if DirectAccess and (Attributes and S_IXUGO <> 0) then
@@ -1986,10 +2060,8 @@ begin
             Exit(FiLinkIconID)
           else if Ext = 'url' then
             Exit(FiLinkIconID)
-          else if Ext = 'ico' then
-            Exit(FiDefaultIconID)
         end;
-      {$ELSEIF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
+      {$ELSEIF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
       if IconsMode = sim_all_and_exe then
         begin
           if DirectAccess and ((Ext = 'desktop') or (Ext = 'directory')) then
@@ -2009,10 +2081,19 @@ begin
         if Result >= 0 then
           Exit(PtrInt(PtrUInt(FExtList.List[Result]^.Data)));
 
+        {$IF DEFINED(MSWINDOWS)}
+        if IconsMode = sim_all then
+        begin
+          if (Ext = 'ico') or (Ext = 'ani') or (Ext = 'cur') then
+            Exit(FiDefaultIconID)
+        end
+        else
+        {$ENDIF}
+
         if IconsMode <= sim_standart then
           Exit(FiDefaultIconID);
 
-        {$IF DEFINED(UNIX)}
+        {$IF DEFINED(UNIX) AND NOT DEFINED(HAIKU)}
 
         if LoadIcon = False then
           Exit(-1);
@@ -2276,7 +2357,7 @@ begin
   // 'Bitmap' should not be freed, because it only points to DriveIconList.
 end;
 
-{$IF NOT DEFINED(DARWIN)}
+{$IF NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
 
 procedure TPixMapManager.LoadApplicationThemeIcon;
 var

@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    Find dialog, with searching in thread
 
-   Copyright (C) 2006-2021 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2006-2023 Alexander Koblov (alexx2000@mail.ru)
    Copyright (C) 2003-2004 Radek Cervinka (radek.cervinka@centrum.cz)
 
    This program is free software; you can redistribute it and/or modify
@@ -17,7 +17,13 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program. If not, see <http://www.gnu.org/licenses/>.}
+   along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+   Notes:
+   1. on MacOS, two Buttons may be display the focused state at the same time.
+      it's caused by Lazarus, it will be fixed atfer Lazarus merges related Patches.
+      see also: https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/39981
+}
 
 unit fFindDlg;
 
@@ -29,12 +35,12 @@ interface
 uses
   Graphics, SysUtils, Classes, Controls, Forms, Dialogs, StdCtrls, ComCtrls,
   ExtCtrls, Menus, EditBtn, Spin, Buttons, DateTimePicker, KASComboBox,
-  fAttributesEdit, uDsxModule, DsxPlugin, uFindThread, uFindFiles, uRegExprU,
-  uSearchTemplate, fSearchPlugin, uFileView, types, DCStrUtils,
+  KASButton, fAttributesEdit, uDsxModule, DsxPlugin, uFindThread, uFindFiles,
+  uRegExprU, uSearchTemplate, fSearchPlugin, uFileView, types, DCStrUtils,
   ActnList, uOSForms, uShellContextMenu, uExceptions, uFileSystemFileSource,
   uFormCommands, uHotkeyManager, LCLVersion, uWcxModule, uFileSource;
 
-{$IF DEFINED(LCLGTK2) or DEFINED(LCLQT) or DEFINED(LCLQT5)}
+{$IF DEFINED(LCLGTK2) or DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6)}
   {$DEFINE FIX_DEFAULT}
 {$ENDIF}
 
@@ -121,6 +127,7 @@ type
     frmContentPlugins: TfrmSearchPlugin;
     gbDirectories: TGroupBox;
     gbFiles: TGroupBox;
+    btnEncoding: TKASButton;
     lblAttributes: TLabel;
     lblExcludeDirectories: TLabel;
     lblCurrent: TLabel;
@@ -202,6 +209,7 @@ type
     procedure actExecute(Sender: TObject);
     procedure btnAddAttributeClick(Sender: TObject);
     procedure btnAttrsHelpClick(Sender: TObject);
+    procedure btnEncodingClick(Sender: TObject);
     procedure btnNewSearchKeyDown(Sender: TObject; var Key: word;
       {%H-}Shift: TShiftState);
     procedure btnSearchDeleteClick(Sender: TObject);
@@ -303,6 +311,10 @@ type
     procedure AfterSearchStopped;  //update button states after stop search(ThreadTerminate call this method)
     procedure AfterSearchFocus;     //set correct focus after search stopped
 
+    procedure UpdateEncodings;
+    function GetEncodings(AList: TCustomComboBox): String;
+    procedure SetEncodings(const AEncodings: String; AList: TCustomComboBox);
+
     procedure FindInArchive(AFileView: TFileView);
     procedure FillFindOptions(out FindOptions: TSearchTemplateRec; SetStartPath: boolean);
     procedure FindOptionsToDSXSearchRec(const AFindOptions: TSearchTemplateRec;
@@ -399,7 +411,7 @@ uses
   uFileViewNotebook, uKeyboard, uOSUtils, uArchiveFileSourceUtil,
   DCOSUtils, uRegExprA, uRegExprW, uDebug, uShowMsg, uConvEncoding,
   uColumns, uFileFunctions, uFileSorting, uWcxArchiveFileSource,
-  DCConvertEncoding, WcxPlugin
+  DCConvertEncoding, WcxPlugin, fChooseEncoding, dmCommonData
 {$IFDEF DARKWIN}
   , uDarkStyle
 {$ENDIF}
@@ -649,7 +661,6 @@ var
   HMFindFiles: THMForm;
 begin
   if not gShowMenuBarInFindFiles then FreeAndNil(mmMainMenu);
-  Height := pnlFindFile.Height + 22;
   DsxPlugins := TDSXModuleList.Create;
   FoundedStringCopy := TStringListTemp.Create;
   FoundedStringCopy.OwnsObjects := True;
@@ -687,6 +698,7 @@ begin
   if I >= 0 then cmbEncoding.Items.Delete(I);
   cmbEncoding.Items.Insert(0, 'Default');
   cmbEncoding.ItemIndex := 0;
+  cmbEncoding.Items.Objects[0]:= TObject(PtrInt(True));
 
   // gray disabled fields
   cbUsePluginChange(Sender);
@@ -732,7 +744,7 @@ procedure TfrmFindDlg.cbUsePluginChange(Sender: TObject);
 begin
   EnableControl(cmbPlugin, cbUsePlugin.Checked);
 
-  if not FUpdating and cmbPlugin.Enabled and cmbPlugin.CanFocus and (Sender = cbUsePlugin) then
+  if not FUpdating and cmbPlugin.Enabled and cmbPlugin.CanSetFocus and (Sender = cbUsePlugin) then
   begin
     cmbPlugin.SetFocus;
     cmbPlugin.SelectAll;
@@ -742,23 +754,17 @@ end;
 { TfrmFindDlg.cmbEncodingSelect }
 procedure TfrmFindDlg.cmbEncodingSelect(Sender: TObject);
 var
-  SupportedEncoding: Boolean;
-  Encoding: String;
+  Index, ItemIndex: Integer;
 begin
-  Encoding := cmbEncoding.Text;
-  SupportedEncoding:= SingleByteEncoding(Encoding);
-  if (not SupportedEncoding) and TRegExprU.AvailableNew then
+  if (cmbEncoding.Tag = 1) then
   begin
-    Encoding := NormalizeEncoding(Encoding);
-    if Encoding = EncodingDefault then Encoding := GetDefaultTextEncoding;
-    SupportedEncoding := Encoding = EncodingUTF8;
+    ItemIndex:= cmbEncoding.ItemIndex;
+    for Index:= 0 to cmbEncoding.Items.Count - 1 do
+    begin
+      cmbEncoding.Items.Objects[Index]:= TObject(PtrInt((ItemIndex = Index)));
+    end;
   end;
-
-  cbTextRegExp.Enabled := cbFindText.Checked and SupportedEncoding and (not chkHex.Checked);
-  if not cbTextRegExp.Enabled then cbTextRegExp.Checked := False;
-
-  cbCaseSens.Enabled:= cbFindText.Checked and (not cbReplaceText.Checked) and (not chkHex.Checked) and (not cbTextRegExp.Checked);
-  if cbFindText.Checked and (not cbCaseSens.Enabled) then cbCaseSens.Checked := not cbTextRegExp.Checked;
+  UpdateEncodings;
 end;
 
 { TfrmFindDlg.Create }
@@ -780,6 +786,8 @@ begin
   finally
     C.Free;
   end;
+
+  dmComData.ilEditorImages.GetBitmap(44, btnEncoding.Glyph);
 
   FCommands := TFormCommands.Create(Self, actList);
 end;
@@ -826,9 +834,9 @@ begin
   EnableControl(cbOfficeXML, cbFindText.Checked);
   lblEncoding.Enabled := cbFindText.Checked;
   cbReplaceText.Checked := False;
-  cmbEncodingSelect(nil);
+  UpdateEncodings;
 
-  if not FUpdating and cmbFindText.Enabled and cmbFindText.CanFocus and (Sender = cbFindText) then
+  if not FUpdating and cmbFindText.Enabled and cmbFindText.CanSetFocus and (Sender = cbFindText) then
   begin
     cmbFindText.SetFocus;
     cmbFindText.SelectAll;
@@ -902,6 +910,7 @@ begin
   cbOfficeXML.Checked := False;
   cbNotContainingText.Checked := False;
   cmbEncoding.ItemIndex := 0;
+  cmbEncoding.Tag := 1;
   cmbEncodingSelect(nil);
 
   // duplicates
@@ -955,6 +964,39 @@ end;
 procedure TfrmFindDlg.btnAttrsHelpClick(Sender: TObject);
 begin
   ShowHelpOrErrorForKeyword('', edtAttrib.HelpKeyword);
+end;
+
+procedure TfrmFindDlg.btnEncodingClick(Sender: TObject);
+var
+  I, Index, ACount: Integer;
+begin
+  if ChooseEncoding(Self, cmbEncoding.Items) then
+  begin
+    I:= 0;
+    ACount:= 0;
+    for Index:= 0 to cmbEncoding.Items.Count - 1 do
+    begin
+      if (PtrInt(cmbEncoding.Items.Objects[Index]) <> 0) then
+      begin
+        I:= Index;
+        Inc(ACount);
+      end;
+    end;
+    if ACount > 1 then
+    begin
+      I:= 0;
+    end
+    else if (ACount = 0) then
+    begin
+      I:= 0;
+      ACount:= 1;
+      cmbEncoding.Items.Objects[I]:= TObject(PtrInt(True));
+    end;
+    cmbEncoding.Tag:= ACount;
+    cmbEncoding.ItemIndex:= I;
+    cmbEncoding.Enabled:= (ACount <= 1);
+    UpdateEncodings;
+  end;
 end;
 
 { TfrmFindDlg.actExecute }
@@ -1068,7 +1110,7 @@ begin
   begin
     cbCaseSens.Checked := Boolean(cbCaseSens.Tag);
   end;
-  cmbEncodingSelect(cmbEncoding);
+  UpdateEncodings;
 end;
 
 { TfrmFindDlg.cbSelectedFilesChange }
@@ -1130,9 +1172,8 @@ begin
   begin
     cbCaseSens.Checked := Boolean(cbCaseSens.Tag);
   end;
-  cmbEncoding.Enabled:= not chkHex.Checked;
   cbReplaceText.Enabled:= not (chkHex.Checked or cbOfficeXML.Checked);
-  cmbEncodingSelect(cmbEncoding);
+  UpdateEncodings;
 end;
 
 { TfrmFindDlg.btnSelDirClick }
@@ -1224,7 +1265,7 @@ begin
     CaseSensitive := cbCaseSens.Checked;
     NotContainingText := cbNotContainingText.Checked;
     TextRegExp := cbTextRegExp.Checked;
-    TextEncoding := cmbEncoding.Text;
+    TextEncoding := GetEncodings(cmbEncoding);
     OfficeXML := cbOfficeXML.Checked;
     { Duplicates }
     Duplicates:= chkDuplicates.Checked;
@@ -1359,11 +1400,10 @@ begin
     begin                          // if user don't press anything - focus on results
       if (pgcSearch.ActivePage = tsResults) and (lsFoundedFiles.Count > 0) then
       begin
+        btnGoToPath.SetFocus;
         lsFoundedFiles.SetFocus;
-        if (lsFoundedFiles.ItemIndex <> -1) then
-        begin
-          lsFoundedFiles.Selected[lsFoundedFiles.ItemIndex] := True;
-        end;
+        if lsFoundedFiles.ItemIndex<0 then lsFoundedFiles.ItemIndex:=0;
+        lsFoundedFiles.Selected[lsFoundedFiles.ItemIndex] := True;
       end
       else
       begin
@@ -1374,6 +1414,80 @@ begin
       end;
     end;
   end;
+end;
+
+procedure TfrmFindDlg.UpdateEncodings;
+var
+  Index: Integer;
+  Encoding: String;
+  SupportedEncoding: Boolean;
+begin
+  SupportedEncoding:= True;
+
+  for Index:= 0 to cmbEncoding.Items.Count - 1 do
+  begin
+    if (PtrInt(cmbEncoding.Items.Objects[Index]) <> 0) then
+    begin
+      Encoding:= cmbEncoding.Items[Index];
+      SupportedEncoding:= SingleByteEncoding(Encoding);
+      if (not SupportedEncoding) and TRegExprU.AvailableNew then
+      begin
+        Encoding := NormalizeEncoding(Encoding);
+        if Encoding = EncodingDefault then Encoding := GetDefaultTextEncoding;
+        SupportedEncoding := Encoding = EncodingUTF8;
+      end;
+      if not SupportedEncoding then Break;
+    end;
+  end;
+
+  btnEncoding.Visible:= not cbReplaceText.Checked;
+  btnEncoding.Enabled:= cbFindText.Checked and (not chkHex.Checked);
+  cmbEncoding.Enabled:= btnEncoding.Enabled and (cmbEncoding.Tag < 2);
+
+  cbTextRegExp.Enabled := cbFindText.Checked and SupportedEncoding and (not chkHex.Checked);
+  if not cbTextRegExp.Enabled then cbTextRegExp.Checked := False;
+
+  cbCaseSens.Enabled:= cbFindText.Checked and (not cbReplaceText.Checked) and (not chkHex.Checked) and (not cbTextRegExp.Checked);
+  if cbFindText.Checked and (not cbCaseSens.Enabled) then cbCaseSens.Checked := not cbTextRegExp.Checked;
+end;
+
+function TfrmFindDlg.GetEncodings(AList: TCustomComboBox): String;
+var
+  Index: Integer;
+begin
+  Result:= EmptyStr;
+
+  for Index:= 0 to AList.Items.Count - 1 do
+  begin
+    if (PtrInt(AList.Items.Objects[Index]) <> 0) then
+    begin
+      Result+= AList.Items[Index] + '|';
+    end;
+  end;
+
+  if Length(Result) = 0 then Result:= AList.Text;
+end;
+
+procedure TfrmFindDlg.SetEncodings(const AEncodings: String;
+  AList: TCustomComboBox);
+var
+  S: TStringArray;
+  I, Index, ACount: Integer;
+begin
+  ACount:= 0;
+  S:= SplitString(AEncodings, '|');
+
+  for Index:= 0 to High(S) do
+  begin
+    I:= AList.Items.IndexOf(S[Index]);
+    if (I >= 0) then
+    begin
+      Inc(ACount);
+      AList.Items.Objects[I]:= TObject(PtrInt(True));
+    end;
+  end;
+  AList.Tag:= ACount;
+  if ACount = 1 then AList.ItemIndex:= I;
 end;
 
 procedure TfrmFindDlg.FindInArchive(AFileView: TFileView);
@@ -1448,7 +1562,7 @@ begin
         lsFoundedFiles.ScrollWidth := iTemp + 32;
     end;
     lsFoundedFiles.Items.AddObject(sText, Sender);
-{$IF DEFINED(LCLQT) or DEFINED(LCLQT5)}
+{$IF DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6)}
     Application.ProcessMessages;
 {$ENDIF}
   end;
@@ -1477,14 +1591,33 @@ end;
 
 { TfrmFindDlg.cbReplaceTextChange }
 procedure TfrmFindDlg.cbReplaceTextChange(Sender: TObject);
+var
+  Index: Integer;
 begin
   EnableControl(cmbReplaceText, cbReplaceText.Checked and cbFindText.Checked);
   cbNotContainingText.Checked := False;
   cbNotContainingText.Enabled := (not cbReplaceText.Checked and cbFindText.Checked);
 
-  cmbEncodingSelect(cmbEncoding);
+  if cmbReplaceText.Enabled and (cmbEncoding.Tag > 1) then
+  begin
+    for Index:= cmbEncoding.Items.Count - 1 downto 0 do
+    begin
+      if (PtrInt(cmbEncoding.Items.Objects[Index]) <> 0) then
+      begin
+        if cmbEncoding.Tag = 1 then
+        begin
+          cmbEncoding.ItemIndex:= Index;
+          Break;
+        end;
+        cmbEncoding.Tag:= cmbEncoding.Tag - 1;
+        cmbEncoding.Items.Objects[Index]:= nil;
+      end;
+    end;
+  end;
 
-  if not FUpdating and cmbReplaceText.Enabled and cmbReplaceText.CanFocus then
+  UpdateEncodings;
+
+  if not FUpdating and cmbReplaceText.Enabled and cmbReplaceText.CanSetFocus then
   begin
     cmbReplaceText.SetFocus;
     cmbReplaceText.SelectAll;
@@ -1626,7 +1759,7 @@ begin
   // Show search results page
   pgcSearch.ActivePage := tsResults;
 
-  if lsFoundedFiles.CanFocus then
+  if lsFoundedFiles.CanSetFocus then
     lsFoundedFiles.SetFocus;
 
   ClearResults;
@@ -1769,8 +1902,6 @@ begin
   lblFound.Caption := EmptyStr;
   SetWindowCaption(wcs_NewSearch);
   if pgcSearch.ActivePage = tsStandard then cmbFindFileMask.SetFocus;
-
-  btnStart.Default := True;
 end;
 
 { TfrmFindDlg.cm_LastSearch }
@@ -2108,9 +2239,9 @@ begin
 
   if (AWindowCaptionStyle and $08) <> 0 then
   begin
-    sBuildingCaptionName := sBuildingCaptionName + ' - File: ' + GetFileMask;
+    sBuildingCaptionName := sBuildingCaptionName + ' - Files: ' + GetFileMask;
     if cbFindText.Checked then
-      sBuildingCaptionName := sBuildingCaptionName + ' - Text:' + cmbFindText.Text;
+      sBuildingCaptionName := sBuildingCaptionName + ' - Text: ' + cmbFindText.Text;
   end;
 
   Caption := sBuildingCaptionName;
@@ -2210,6 +2341,10 @@ end;
 { TfrmFindDlg.FormShow }
 procedure TfrmFindDlg.frmFindDlgShow(Sender: TObject);
 begin
+  {$IFDEF LCLCOCOA}
+  pgcSearch.DoAdjustClientRectChange();
+  {$ENDIF}
+
   pgcSearch.PageIndex := 0;
 
   if cmbFindFileMask.Visible then
@@ -2218,7 +2353,7 @@ begin
   lsFoundedFiles.Canvas.Font := lsFoundedFiles.Font;
 
   if pgcSearch.ActivePage = tsStandard then
-    if cmbFindFileMask.CanFocus then
+    if cmbFindFileMask.CanSetFocus then
       cmbFindFileMask.SetFocus;
 
   cbSelectedFiles.Checked := FSelectedFiles.Count > 0;
@@ -2330,8 +2465,9 @@ begin
     cbCaseSens.Checked := CaseSensitive;
     cbNotContainingText.Checked := NotContainingText;
     cbTextRegExp.Checked := TextRegExp;
-    cmbEncoding.Text := TextEncoding;
+    SetEncodings(TextEncoding, cmbEncoding);
     cbOfficeXML.Checked := OfficeXML;
+    UpdateEncodings;
 
     if cbFindInArchive.Enabled then
     begin
@@ -2357,13 +2493,16 @@ begin
     //1. If we're using at least plug in, switch to it.
     //2. If not but we're using at least something from the "Advanced" tab, switch to it.
     //3. If nothing above, at least switch to "Standard" tab.
+    pgcSearch.Options:= pgcSearch.Options + [nboDoChangeOnSetIndex];
     if (cbUsePlugin.Checked OR frmContentPlugins.chkUsePlugins.Checked) then
       pgcSearch.ActivePage := tsPlugins
     else
       if (cbNotOlderThan.Checked OR cbFileSizeFrom.Checked OR cbFileSizeTo.Checked OR cbDateFrom.Checked OR cbDateTo.Checked OR cbTimeFrom.Checked OR cbTimeTo.Checked OR (edtAttrib.Text<>'')) then
         pgcSearch.ActivePage := tsAdvanced
-      else
+      else begin
         pgcSearch.ActivePage := tsStandard;
+      end;
+    pgcSearch.Options:= pgcSearch.Options - [nboDoChangeOnSetIndex];
   end;
 end;
 
@@ -2757,13 +2896,13 @@ procedure TfrmFindDlg.pgcSearchChange(Sender: TObject);
 begin
   if pgcSearch.ActivePage = tsStandard then
   begin
-    if (not cmbFindFileMask.Focused) and (cmbFindFileMask.CanFocus) then
+    if (not cmbFindFileMask.Focused) and (cmbFindFileMask.CanSetFocus) then
       cmbFindFileMask.SetFocus;
   end
   else
   if pgcSearch.ActivePage = tsResults then
   begin
-    if (not lsFoundedFiles.Focused) and (lsFoundedFiles.CanFocus) then
+    if (not lsFoundedFiles.Focused) and (lsFoundedFiles.CanSetFocus) then
       lsFoundedFiles.SetFocus;
   end;
 end;

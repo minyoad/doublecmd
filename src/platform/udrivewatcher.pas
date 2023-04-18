@@ -58,6 +58,12 @@ uses
    {$IFDEF LINUX}
    , uUDisks, uUDev, uMountWatcher, DCStrUtils, uOSUtils, FileUtil, uGVolume, DCOSUtils
    {$ENDIF}
+   {$IFDEF DARWIN}
+   , uMyDarwin    // Workarounds for FPC RTL Bug
+   {$ENDIF}
+   {$IFDEF HAIKU}
+   , BaseUnix, DCHaiku
+   {$ENDIF}
   {$ENDIF}
   {$IFDEF MSWINDOWS}
   uMyWindows, Windows, JwaDbt, LazUTF8, JwaWinNetWk, ShlObj, DCOSUtils, uDebug,
@@ -79,6 +85,13 @@ type
 {$ENDIF}
 
 {$IFDEF BSD}
+// Workarounds for FPC RTL Bug
+{$IFDEF DARWIN}
+type TFixedStatfs = TDarwinStatfs;
+{$ELSE}
+type TFixedStatfs = TStatFs;
+{$ENDIF}
+
 const
   {$warning Remove this two constants when they are added to FreePascal}
   NOTE_MOUNTED = $0008;
@@ -113,13 +126,23 @@ type
     end;
 {$ENDIF}
 
+{$IFDEF HAIKU}
+type
+  TMountPoint = class
+    Path: String;
+    Device: dev_t;
+    Root: ino_t;
+  end;
+
+  TMountPoints = specialize TFPGObjectList<TMountPoint>;
+{$ENDIF}
+
 var
   FObservers: TDriveWatcherObserverList = nil;
   InitializeCounter: Integer = 0;
   {$IFDEF LINUX}
   FakeClass: TFakeClass = nil;
   MountWatcher: TMountWatcher = nil;
-  IsUDisksAvailable: Boolean = False;
   {$ENDIF}
   {$IFDEF MSWINDOWS}
   OldWProc: WNDPROC;
@@ -297,23 +320,15 @@ begin
   {$IFDEF LINUX}
   FakeClass := TFakeClass.Create;
 
-  if uUDisks.Initialize then
+  if HasUdev then
   begin
-    IsUDisksAvailable := True;
-    uUDisks.AddObserver(@FakeClass.OnUDisksNotify);
-  end
-  else
-  begin
-    if HasUdev then
-    begin
-      if uUDev.Initialize then
-        uUDev.AddObserver(@FakeClass.OnUDisksNotify);
-    end;
-    DCDebug('Detecting mounts through /proc/self/mounts');
-    MountWatcher:= TMountWatcher.Create;
-    MountWatcher.OnMountEvent:= @FakeClass.OnMountWatcherNotify;
-    MountWatcher.Start;
+    if uUDev.Initialize then
+      uUDev.AddObserver(@FakeClass.OnUDisksNotify);
   end;
+  DCDebug('Detecting mounts through /proc/self/mounts');
+  MountWatcher:= TMountWatcher.Create;
+  MountWatcher.OnMountEvent:= @FakeClass.OnMountWatcherNotify;
+  MountWatcher.Start;
 
   uGVolume.Initialize;
   uGVolume.AddObserver(@FakeClass.OnGVolumeNotify);
@@ -338,13 +353,7 @@ begin
     Exit;
 
   {$IFDEF LINUX}
-  if IsUDisksAvailable then
-  begin
-    uUDisks.RemoveObserver(@FakeClass.OnUDisksNotify);
-    uUDisks.Finalize;
-    IsUDisksAvailable := False;
-  end
-  else if HasUdev then
+  if HasUdev then
   begin
     uUDev.RemoveObserver(@FakeClass.OnUDisksNotify);
     uUDev.Finalize;
@@ -417,11 +426,6 @@ begin
       end;
     end;
     Result := False;
-  end
-  else if IsUDisksAvailable then
-  begin
-    // Devices not supplied, retrieve info from UDisks.
-    Result := uUDisks.GetDeviceInfo(DeviceObjectPath, DeviceInfo);
   end
   else
   begin
@@ -501,11 +505,17 @@ begin
       Drive^.DriveType := dtUnknown;
 
     Drive^.IsMediaAvailable := DeviceIsMediaAvailable;
-    Drive^.IsMediaEjectable := DeviceIsDrive and DriveIsMediaEjectable;
+    Drive^.IsMediaEjectable := DriveIsMediaEjectable;
     Drive^.IsMediaRemovable := DeviceIsRemovable;
     Drive^.IsMounted := DeviceIsMounted;
     Drive^.AutoMount := (DeviceAutomountHint = EmptyStr) or (DeviceAutomountHint = 'always');
+
   end;
+
+  // DriveSize is not correct when Optical drive isn't mounted (at least in Linux)
+  with Drive^ do
+    if (DriveType = dtOptical) and not IsMounted then
+      DriveSize := 0;
 end;
 {$ENDIF}
 
@@ -579,6 +589,7 @@ begin
     if WinDriveType = DRIVE_NO_ROOT_DIR then Continue;
     New(Drive);
     Result.Add(Drive);
+    ZeroMemory(Drive, SizeOf(TDrive));
     with Drive^ do
     begin
       DeviceId := EmptyStr;
@@ -873,7 +884,7 @@ var
       DeviceFile := mbReadAllLinks('/dev/disk/by-partuuid/' +
                                    GetStrMaybeQuoted(Copy(DeviceFile, 10, MaxInt)));
       if Length(DeviceFile) > 0 then
-        UDisksDeviceObject := DeviceFileToUDisksObjectPath(DeviceFile);
+        UDisksDeviceObject := UDisksGetDeviceObjectByDeviceFile(DeviceFile, UDisksDevices);
       Result := True;
     end
     else if StrBegins(DeviceFile, 'PARTLABEL=') then
@@ -881,16 +892,13 @@ var
       DeviceFile := mbReadAllLinks('/dev/disk/by-partlabel/' +
                                    GetStrMaybeQuoted(Copy(DeviceFile, 11, MaxInt)));
       if Length(DeviceFile) > 0 then
-        UDisksDeviceObject := DeviceFileToUDisksObjectPath(DeviceFile);
+        UDisksDeviceObject := UDisksGetDeviceObjectByDeviceFile(DeviceFile, UDisksDevices);
       Result := True;
     end
     else if StrBegins(DeviceFile, '/dev/') then
     begin
       DeviceFile := mbCheckReadLinks(DeviceFile);
-      if StrBegins(DeviceFile, '/dev/') and IsUDisksAvailable then
-        UDisksDeviceObject := DeviceFileToUDisksObjectPath(DeviceFile)
-      else
-        UDisksDeviceObject := UDisksGetDeviceObjectByDeviceFile(DeviceFile, UDisksDevices);
+      UDisksDeviceObject := UDisksGetDeviceObjectByDeviceFile(DeviceFile, UDisksDevices);
       Result := True;
     end
     else
@@ -917,9 +925,7 @@ begin
     AddedDevices := TStringList.Create;
     AddedMountPoints := TStringList.Create;
 
-    if IsUDisksAvailable then
-      HaveUDisksDevices := uUDisks.EnumerateDevices(UDisksDevices)
-    else if HasUdev then
+    if HasUdev then
       HaveUDisksDevices := uUDev.EnumerateDevices(UDisksDevices);
 
     // Storage devices have to be in mtab or fstab and reported by UDisks.
@@ -948,11 +954,8 @@ begin
               begin
                 if not UDisksDevice.DevicePresentationHide then
                 begin
-                  if (IsUDisksAvailable = False) then
-                  begin
-                    UDisksDevice.DeviceIsMounted:= (I = 1);
-                    AddString(UDisksDevice.DeviceMountPaths, MountPoint);
-                  end;
+                  UDisksDevice.DeviceIsMounted:= (I = 1);
+                  AddString(UDisksDevice.DeviceMountPaths, MountPoint);
                   UDisksDeviceToDrive(UDisksDevices, UDisksDevice, Drive);
                 end;
               end
@@ -971,6 +974,7 @@ begin
             if (Drive = nil) then
             begin
               New(Drive);
+              FillChar(Drive^, SizeOf(TDrive), 0);
               UpdateDrive := False;
             end
             else begin
@@ -1054,6 +1058,7 @@ begin
         // Don't add drives with ram and loop device because they cannot be mounted.
         // Add devices reported as "filesystem".
         if ((UDisksDevices[i].DeviceIsDrive and (not UDisksDevices[i].DeviceIsPartitionTable) and
+           (BeginsWithString(['floppy', 'optical'], UDisksDevices[i].DriveMediaCompatibility)) and
            (UDisksDevices[i].IdType <> 'swap')) or (UDisksDevices[i].IdUsage = 'filesystem')) and
            (StrBegins(UDisksDevices[i].DeviceFile, '/dev/ram') = False) and
            (StrBegins(UDisksDevices[i].DeviceFile, '/dev/zram') = False) and
@@ -1111,6 +1116,8 @@ end;
       Result := dtHardDisk
     else if FSType = 'exfat' then
       Result := dtHardDisk
+    else if FSType = 'lifs' then
+      Result := dtHardDisk
     else if FSType = 'ufsd_NTFS' then
       Result := dtHardDisk
     else if FSType = 'tuxera_ntfs' then
@@ -1163,8 +1170,8 @@ const
 var
   drive: PDrive;
   fstab: PFSTab;
-  fs: TStatFS;
-  fsList: array[0..MAX_FS] of TStatFS;
+  fs: TFixedStatfs;
+  fsList: array[0..MAX_FS] of TFixedStatfs;
   iMounted, iAdded, count: Integer;
   found: boolean;
   dtype: TDriveType;
@@ -1267,6 +1274,90 @@ begin
     end; { with }
   end; { for }
 end;
+{$ELSEIF DEFINED(HAIKU)}
+var
+  dev: dev_t;
+  DirPtr: pDir;
+  Drive: PDrive;
+  APath: String;
+  APos: cint = 0;
+  Index: Integer;
+  fs_info: Tfs_info;
+  PtrDirEnt: pDirent;
+  Info: BaseUnix.Stat;
+  MountPoint: TMountPoint;
+  MountPoints: TMountPoints;
+begin
+  Result := TDrivesList.Create;
+  MountPoints:= TMountPoints.Create(True);
+
+  // Haiku mounts drives to root directory
+  DirPtr:= fpOpenDir(PAnsiChar('/'));
+  if Assigned(DirPtr) then
+  try
+    PtrDirEnt:= fpReadDir(DirPtr^);
+    while PtrDirEnt <> nil do
+    begin
+      if (PtrDirEnt^.d_name <> '..') and (PtrDirEnt^.d_name <> '.') then
+      begin
+        APath:= PathDelim + PtrDirEnt^.d_name;
+
+        if fpLStat(APath, Info) = 0 then
+        begin
+          if fpS_ISDIR(Info.st_mode) then
+          begin
+            MountPoint:= TMountPoint.Create;
+            MountPoint.Path:= APath;
+            MountPoint.Device:= Info.st_dev;
+            MountPoint.Root:= Info.st_ino;
+            MountPoints.Add(MountPoint);
+          end;
+        end;
+      end;
+      PtrDirEnt:= fpReadDir(DirPtr^);
+    end;
+  finally
+    fpCloseDir(DirPtr^);
+  end;
+
+  dev:= next_dev(@APos);
+
+  while (dev >= 0) do
+  begin
+    if (fs_stat_dev(dev, @fs_info) >= 0) then
+    begin
+      if (fs_info.fsh_name <> 'devfs') then
+      begin
+        for Index:= 0 to MountPoints.Count - 1 do
+        begin
+          MountPoint:= MountPoints[Index];
+
+          if (MountPoint.Device = fs_info.dev) and (MountPoint.Root = fs_info.root) then
+          begin
+            New(Drive);
+            Result.Add(Drive);
+            with Drive^ do
+            begin
+              DeviceId := fs_info.device_name;
+              Path := MountPoint.Path;
+              DisplayName := ExtractFilename(Path);
+              DriveLabel := fs_info.volume_name;
+              FileSystem := fs_info.fsh_name;
+              IsMediaAvailable := True;
+              IsMediaEjectable := False;
+              IsMediaRemovable := (fs_info.flags and B_FS_IS_REMOVABLE <> 0);
+              IsMounted := True;
+              AutoMount := True;
+            end;
+            Break;
+          end;
+        end;
+      end;
+    end;
+    dev:= next_dev(@APos)
+  end;
+  MountPoints.Free;
+end;
 {$ELSE}
 begin
   Result := TDrivesList.Create;
@@ -1304,10 +1395,7 @@ var
   ADrive: PDrive = nil;
   DeviceInfo: TUDisksDeviceInfo;
 begin
-  if IsUDisksAvailable = False then
-    Result:= uUDev.GetDeviceInfo(ObjectPath, DeviceInfo)
-  else
-    Result:= uUDisks.GetDeviceInfo(ObjectPath, DeviceInfo);
+  Result:= uUDev.GetDeviceInfo(ObjectPath, DeviceInfo);
 
   if Result then
     UDisksDeviceToDrive(nil, DeviceInfo, ADrive);

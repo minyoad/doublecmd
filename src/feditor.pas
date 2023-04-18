@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    Build-in Editor using SynEdit and his Highlighters
 
-   Copyright (C) 2006-2022  Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2006-2023  Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -26,6 +26,11 @@
      This form used SynEdit and his Highlighters
      contributors:
      Copyright (C) 2006-2015 Alexander Koblov (Alexx2000@mail.ru)
+
+   Notes:
+   1. on MacOS, the Editor dosn't support IME inputting now (such as Chinese/Japanese/Korean)
+      it's caused by Lazarus, it will be supported atfer Lazarus merges related Patches.
+      see also: https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/40008
 }
 
 unit fEditor;
@@ -59,6 +64,7 @@ type
     actEditGotoLine: TAction;
     actEditFindPrevious: TAction;
     actFileReload: TAction;
+    ilBookmarks: TImageList;
     MainMenu1: TMainMenu;
     ActListEdit: TActionList;
     actAbout: TAction;
@@ -149,7 +155,6 @@ type
     procedure frmEditorClose(Sender: TObject; var CloseAction: TCloseAction);
   private
     { Private declarations }
-    bChanged:Boolean;
     bNoName: Boolean;
     FSearchOptions: TEditSearchOptions;
     FFileName: String;
@@ -358,6 +363,7 @@ begin
   FontOptionsToFont(gFonts[dcfEditor], Editor.Font);
   Editor.TabWidth := gEditorSynEditTabWidth;
   Editor.RightEdge := gEditorSynEditRightEdge;
+  Editor.BlockIndent := gEditorSynEditBlockIndent;
 end;
 
 procedure TfrmEditor.actExecute(Sender: TObject);
@@ -485,7 +491,7 @@ begin
     Highlighter := dmHighl.GetHighlighter(Editor, ExtractFileExt(aFileName));
     UpdateHighlighter(Highlighter);
     FileName := aFileName;
-    bChanged := False;
+    Editor.Modified := False;
     bNoname := False;
     UpdateStatus;
   finally
@@ -584,7 +590,7 @@ begin
     Exit;
 
   FFileName := AValue;
-  Caption := FFileName;
+  Caption := ReplaceHome(FFileName);
 end;
 
 destructor TfrmEditor.Destroy;
@@ -711,7 +717,6 @@ end;
 procedure TfrmEditor.EditorChange(Sender: TObject);
 begin
   inherited;
-  bChanged:=True;
   UpdateStatus;
 end;
 
@@ -719,7 +724,7 @@ procedure TfrmEditor.UpdateStatus;
 const
   BreakStyle: array[TTextLineBreakStyle] of String = ('LF', 'CRLF', 'CR');
 begin
-  if bChanged then
+  if Editor.Modified then
     StatusBar.Panels[0].Text:= '*'
   else begin
     StatusBar.Panels[0].Text:= '';
@@ -731,8 +736,9 @@ end;
 
 procedure TfrmEditor.SetEncodingIn(Sender: TObject);
 begin
-  sEncodingIn:= (Sender as TMenuItem).Caption;
-  sEncodingOut:= sEncodingIn;
+  sEncodingStat:= (Sender as TMenuItem).Caption;
+  sEncodingIn:= sEncodingStat;
+  sEncodingOut:= sEncodingStat;
   ChooseEncoding(miEncodingOut, sEncodingOut);
   Editor.Lines.Text:= ConvertEncoding(sOriginalText, sEncodingIn, EncodingUTF8);
   UpdateStatus;
@@ -759,20 +765,25 @@ end;
 procedure TfrmEditor.FormCloseQuery(Sender: TObject;
   var CanClose: Boolean);
 begin
-  CanClose:= False;
-  if bChanged then
+  if not Editor.Modified then
+    CanClose:= True
+  else begin
     case msgYesNoCancel(Format(rsMsgFileChangedSave,[FileName])) of
-      mmrYes: cm_FileSave(['']);
-      mmrNo: bChanged:= False;
+      mmrYes:
+        begin
+          cm_FileSave(['']);
+          CanClose:= not Editor.Modified;
+        end;
+      mmrNo: CanClose:= True;
     else
-      Exit;
+      CanClose:= False;
     end;
-  CanClose:= True;
+  end;
 end;
 
 procedure TfrmEditor.cm_FileReload(const Params: array of string);
 begin
-  if bChanged then
+  if Editor.Modified then
   begin
     if not msgYesNo(rsMsgFileReloadWarning) then
       Exit;
@@ -788,10 +799,13 @@ end;
 procedure TfrmEditor.cm_EditFindNext(const Params:array of string);
 begin
   if gFirstTextSearch then
+  begin
+    FSearchOptions.Flags -= [ssoBackwards];
     ShowSearchReplaceDialog(Self, Editor, cbUnchecked, FSearchOptions)
+  end
   else if FSearchOptions.SearchText <> '' then
   begin
-    DoSearchReplaceText(Editor, False, ssoBackwards in FSearchOptions.Flags, FSearchOptions);
+    DoSearchReplaceText(Editor, False, False, FSearchOptions);
     FSearchOptions.Flags -= [ssoEntireScope];
   end;
 end;
@@ -898,7 +912,7 @@ begin
   if not CanClose then Exit;
   FileName := rsMsgNewFile;
   Editor.Lines.Clear;
-  bChanged:= False;
+  Editor.Modified:= False;
   bNoname:= True;
   UpdateStatus;
 end;
@@ -928,7 +942,6 @@ begin
   else
   begin
     SaveFile(FileName);
-    bChanged:=False;
     UpdateStatus;
   end;
 end;
@@ -944,7 +957,6 @@ begin
 
   FileName := dmComData.SaveDialog.FileName;
   SaveFile(FileName);
-  bChanged:=False;
   bNoname:=False;
 
   UpdateStatus;

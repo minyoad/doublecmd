@@ -7,7 +7,7 @@ uses
   FPCAdds,
   SysUtils,
   Classes,
-  ZipFunc in 'ZipFunc.pas';
+  ZipFunc, ZipOpt;
 
 exports
   { Mandatory }
@@ -27,6 +27,7 @@ exports
   DeleteFilesW,
   GetPackerCaps,
   ConfigurePacker,
+  GetBackgroundFlags,
   CanYouHandleThisFileW,
   { Extension API }
   ExtensionInitialize;

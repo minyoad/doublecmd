@@ -4,7 +4,7 @@
    This unit contains DC actions of the main form
 
    Copyright (C) 2008  Dmitry Kolomiets (B4rr4cuda@rambler.ru)
-   Copyright (C) 2008-2021 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2008-2023 Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -386,7 +386,7 @@ uses fOptionsPluginsBase, fOptionsPluginsDSX, fOptionsPluginsWCX,
      fLinker, fSplitter, fDescrEdit, fCheckSumVerify, fCheckSumCalc, fSetFileProperties,
      uLng, uLog, uShowMsg, uOSForms, uOSUtils, uDCUtils, uBriefFileView, fSelectDuplicates,
      uShowForm, uShellExecute, uClipboard, uHash, uDisplayFile, uLuaPas, uSysFolders,
-     uFilePanelSelect, uFileSystemFileSource, uQuickViewPanel, Math,
+     uFilePanelSelect, uFileSystemFileSource, uQuickViewPanel, Math, fViewer,
      uOperationsManager, uFileSourceOperationTypes, uWfxPluginFileSource,
      uFileSystemDeleteOperation, uFileSourceExecuteOperation, uSearchResultFileSource,
      uFileSourceOperationMessageBoxesUI, uFileSourceCalcChecksumOperation,
@@ -398,12 +398,8 @@ uses fOptionsPluginsBase, fOptionsPluginsDSX, fOptionsPluginsWCX,
      DCOSUtils, DCStrUtils, DCBasicTypes, uFileSourceCopyOperation, fSyncDirsDlg,
      uHotDir, DCXmlConfig, dmCommonData, fOptionsFrame, foptionsDirectoryHotlist,
      fMainCommandsDlg, uConnectionManager, fOptionsFavoriteTabs, fTreeViewMenu,
-     uArchiveFileSource, fOptionsHotKeys, fBenchmark, uAdministrator, uWcxArchiveFileSource
-     {$IFDEF COLUMNSFILEVIEW_VTV}
-     , uColumnsFileViewVtv
-     {$ELSE}
-     , uColumnsFileView
-     {$ENDIF}
+     uArchiveFileSource, fOptionsHotKeys, fBenchmark, uAdministrator, uWcxArchiveFileSource,
+     uColumnsFileView
      ;
 
 resourcestring
@@ -560,7 +556,7 @@ begin
     CalcStatisticsOperationStatistics := CalcStatisticsOperation.RetrieveStatistics;
     with CalcStatisticsOperationStatistics do
     begin
-      msgOK(Format(rsSpaceMsg, [Files, Directories, cnvFormatFileSize(Size), Numb2USA(IntToStr(Size))]));
+      msgOK(Format(rsSpaceMsg, [Files, Directories, cnvFormatFileSize(Size), IntToStrTS(Size)]));
     end;
   end;
 end;
@@ -708,7 +704,10 @@ var
 begin
   FileSource:= TVfsFileSource.Create(gWFXPlugins);
   if Assigned(FileSource) then
+  begin
     Panel.AddFileSource(FileSource, FileSource.GetRootDir);
+    frmMain.ActiveFrame.SetFocus;
+  end;
 end;
 
 procedure TMainCommands.DoPanelsSplitterPerPos(SplitPos: Integer);
@@ -867,7 +866,17 @@ begin
         // Change file source, if the file under cursor can be opened as another file source.
         try
           if not ChooseFileSource(TargetPage.FileView, SourcePage.FileView.FileSource, aFile) then
+          begin
+            if SourcePage.FileView.FileSource.IsClass(TArchiveFileSource) then
+            begin
+              NewPath:= ExtractFilePath(SourcePage.FileView.FileSource.CurrentAddress);
+              if not mbCompareFileNames(TargetPage.FileView.CurrentPath, NewPath) then
+              begin
+                TargetPage.FileView.AddHistory(TFileSystemFileSource.GetFileSource, NewPath);
+              end;
+            end;
             TargetPage.FileView.AddFileSource(SourcePage.FileView.FileSource, aFile.Path);
+          end;
           TargetPage.FileView.SetActiveFile(aFile.Name);
         except
           on e: EFileSourceException do
@@ -1418,30 +1427,39 @@ var
   Param: String;
   TargetPath: String;
   SelectedFiles: TFiles;
+  TargetFileSource: IFileSource;
 begin
   with frmMain do
   begin
-    SelectedFiles := ActiveFrame.CloneSelectedOrActiveFiles;
-    try
-      if SelectedFiles.Count = 0 then
-        msgWarning(rsMsgNoFilesSelected)
-      else begin
-        Param := GetDefaultParam(Params);
-        if Param = 'PackHere' then
-          TargetPath:= ActiveFrame.CurrentPath
+    Param := GetDefaultParam(Params);
+    if Param = 'PackHere' then
+    begin
+      TargetPath:= ActiveFrame.CurrentPath;
+      TargetFileSource:= ActiveFrame.FileSource;
+    end
+    else begin
+      TargetPath:= NotActiveFrame.CurrentPath;
+      TargetFileSource:= NotActiveFrame.FileSource;
+    end;
+    if not (fspDirectAccess in TargetFileSource.Properties) then
+      msgError(rsMsgErrNotSupported)
+    else begin
+      SelectedFiles := ActiveFrame.CloneSelectedOrActiveFiles;
+      try
+        if SelectedFiles.Count = 0 then
+          msgWarning(rsMsgNoFilesSelected)
         else begin
-          TargetPath:= NotActiveFrame.CurrentPath;
+          ShowPackDlg(frmMain,
+                      ActiveFrame.FileSource,
+                      nil, // No specific target (create new)
+                      SelectedFiles,
+                      TargetPath,
+                      PathDelim { Copy to root of archive } {NotActiveFrame.FileSource.GetRootString}
+                     );
         end;
-        ShowPackDlg(frmMain,
-                    ActiveFrame.FileSource,
-                    nil, // No specific target (create new)
-                    SelectedFiles,
-                    TargetPath,
-                    PathDelim { Copy to root of archive } {NotActiveFrame.FileSource.GetRootString}
-                   );
+      finally
+        FreeAndNil(SelectedFiles);
       end;
-    finally
-      FreeAndNil(SelectedFiles);
     end;
   end;
 end;
@@ -1940,6 +1958,8 @@ procedure TMainCommands.cm_View(const Params: array of string);
 var
   aFile: TFile;
   i, n: Integer;
+  AMode: Integer = 0;
+  Param, AValue: String;
   sl: TStringList = nil;
   ActiveFile: TFile = nil;
   AllFiles: TFiles = nil;
@@ -1961,6 +1981,38 @@ begin
     begin
       ActiveFrame.ExecuteCommand('cm_Open', []);
       Exit;
+    end;
+
+    if (SelectedFiles.Count = 1) and (Length(Params) > 0) then
+    begin
+      for Param in Params do
+      begin
+        if GetParamValue(Param, 'mode', AValue) then
+        begin
+          case LowerCase(AValue) of
+          'text': AMode:= 1;
+          'bin':  AMode:= 2;
+          'hex':  AMode:= 3;
+          'dec':  AMode:= 6;
+          end;
+          Break;
+        end;
+      end;
+      if (AMode > 0) then
+      begin
+        with TViewerModeData.Create(AMode) do
+        begin
+          if PrepareData(ActiveFrame.FileSource, SelectedFiles, @OnCopyOutStateChanged) = pdrInCallback then
+          begin
+            Exit;
+          end;
+          Free;
+        end;
+        sl := TStringList.Create;
+        sl.Add(SelectedFiles[0].FullPath);
+        ShowViewer(sl, AMode);
+        Exit;
+      end;
     end;
 
     if SelectedFiles.Count = 0 then
@@ -2359,7 +2411,7 @@ begin
 
     if bMakeViaCopy then
     begin
-      Directory := GetTempName(GetTempFolderDeletableAtTheEnd);
+      Directory := GetTempName(GetTempFolderDeletableAtTheEnd, EmptyStr);
       if not mbForceDirectory(IncludeTrailingBackslash(Directory) + sPath) then
       begin
         MessageDlg(mbSysErrorMessage(GetLastOSError), mtError, [mbOK], 0);
@@ -3480,123 +3532,78 @@ begin
 end;
 
 procedure TMainCommands.cm_SortByName(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfNameNoExtension);
-  DoSortByFunctions(frmMain.ActiveFrame, FileFunctions);
+  DoSortByFunctions(frmMain.ActiveFrame, [fsfNameNoExtension]);
 end;
 
 procedure TMainCommands.cm_SortByExt(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfExtension);
-  DoSortByFunctions(frmMain.ActiveFrame, FileFunctions);
+  DoSortByFunctions(frmMain.ActiveFrame, [fsfExtension]);
 end;
 
 procedure TMainCommands.cm_SortBySize(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfSize);
-  DoSortByFunctions(frmMain.ActiveFrame, FileFunctions);
+  DoSortByFunctions(frmMain.ActiveFrame, [fsfSize]);
 end;
 
 procedure TMainCommands.cm_SortByDate(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfModificationTime);
-  DoSortByFunctions(frmMain.ActiveFrame, FileFunctions);
+  DoSortByFunctions(frmMain.ActiveFrame, [fsfModificationTime]);
 end;
 
 procedure TMainCommands.cm_SortByAttr(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfAttr);
-  DoSortByFunctions(frmMain.ActiveFrame, FileFunctions);
+  DoSortByFunctions(frmMain.ActiveFrame, [fsfAttr]);
 end;
 
 procedure TMainCommands.cm_LeftSortByName(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfNameNoExtension);
-  DoSortByFunctions(frmMain.FrameLeft, FileFunctions);
+  DoSortByFunctions(frmMain.FrameLeft, [fsfNameNoExtension]);
 end;
 
 procedure TMainCommands.cm_LeftSortByExt(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfExtension);
-  DoSortByFunctions(frmMain.FrameLeft, FileFunctions);
+  DoSortByFunctions(frmMain.FrameLeft, [fsfExtension]);
 end;
 
 procedure TMainCommands.cm_LeftSortBySize(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfSize);
-  DoSortByFunctions(frmMain.FrameLeft, FileFunctions);
+  DoSortByFunctions(frmMain.FrameLeft, [fsfSize]);
 end;
 
 procedure TMainCommands.cm_LeftSortByDate(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfModificationTime);
-  DoSortByFunctions(frmMain.FrameLeft, FileFunctions);
+  DoSortByFunctions(frmMain.FrameLeft, [fsfModificationTime]);
 end;
 
 procedure TMainCommands.cm_LeftSortByAttr(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfAttr);
-  DoSortByFunctions(frmMain.FrameLeft, FileFunctions);
+  DoSortByFunctions(frmMain.FrameLeft, [fsfAttr]);
 end;
 
 procedure TMainCommands.cm_RightSortByName(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfNameNoExtension);
-  DoSortByFunctions(frmMain.FrameRight, FileFunctions);
+  DoSortByFunctions(frmMain.FrameRight, [fsfNameNoExtension]);
 end;
 
 procedure TMainCommands.cm_RightSortByExt(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfExtension);
-  DoSortByFunctions(frmMain.FrameRight, FileFunctions);
+  DoSortByFunctions(frmMain.FrameRight, [fsfExtension]);
 end;
 
 procedure TMainCommands.cm_RightSortBySize(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfSize);
-  DoSortByFunctions(frmMain.FrameRight, FileFunctions);
+  DoSortByFunctions(frmMain.FrameRight, [fsfSize]);
 end;
 
 procedure TMainCommands.cm_RightSortByDate(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfModificationTime);
-  DoSortByFunctions(frmMain.FrameRight, FileFunctions);
+  DoSortByFunctions(frmMain.FrameRight, [fsfModificationTime]);
 end;
 
 procedure TMainCommands.cm_RightSortByAttr(const Params: array of string);
-var
-  FileFunctions: TFileFunctions = nil;
 begin
-  AddSortFunction(FileFunctions, fsfAttr);
-  DoSortByFunctions(frmMain.FrameRight, FileFunctions);
+  DoSortByFunctions(frmMain.FrameRight, [fsfAttr]);
 end;
 
 { Command to request to sort a frame with a column with a defined order.
@@ -3729,10 +3736,10 @@ begin
 
     PushPop(AElevate);
     try
+      sNewFile := TrimPath(sNewFile);
       Attrs := FileGetAttrUAC(sNewFile);
       if Attrs = faInvalidAttributes then
       begin
-        sNewFile := TrimPath(sNewFile);
         hFile := FileCreateUAC(sNewFile, fmShareDenyWrite);
         if hFile = feInvalidHandle then
         begin
@@ -5096,7 +5103,11 @@ begin
   begin
     // Get script file name
     FileName:= PrepareParameter(Params[0]);
-    if not mbFileExists(FileName) then Exit;
+    if not mbFileExists(FileName) then
+    begin
+      msgError(Format(rsMsgFileNotFound, [Filename]));
+      Exit;
+    end;
 
     // Get script arguments
     Count:= Length(Params) - 1;

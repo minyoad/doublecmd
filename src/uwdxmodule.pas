@@ -36,7 +36,8 @@ uses
   Classes, SysUtils, dynlibs,
 
   //DC
-  uLng, uWdxPrototypes, WdxPlugin, uDetectStr, lua, uFile, DCXmlConfig;
+  uLng, uWdxPrototypes, WdxPlugin, uDetectStr, lua, uFile, DCXmlConfig,
+  uExtension;
 
 const
   WDX_MAX_LEN = 2048;
@@ -59,7 +60,7 @@ type
 
   { TWDXModule }
 
-  TWDXModule = class
+  TWDXModule = class(TDcxModule)
   private
     FFieldsList: TStringList;
     FParser:     TParserControl;
@@ -116,7 +117,6 @@ type
 
   TPluginWDX = class(TWDXModule)
   protected
-    FModuleHandle: TLibHandle;  // Handle to .DLL or .so
     FForce:     Boolean;
     FName:      String;
   protected
@@ -289,25 +289,39 @@ type
 // Double Commander <-> Total Commander
 
 const
-  WdxLangTable: array[0..16, 0..1] of String =
+  WdxLangTable: array[0..30, 0..1] of String =
   (
-   ('zh_CN', 'CHN'),
-   ('cs',    'CZ' ),
-   ('da',    'DAN'),
-   ('de',    'DEU'),
-   ('nl',    'DUT'),
-   ('es',    'ESP'),
-   ('fr',    'FRA'),
-   ('hu',    'HUN'),
-   ('it',    'ITA'),
-   ('ko',    'KOR'),
-   ('nb',    'NOR'),
-   ('pl',    'POL'),
-   ('ro',    'ROM'),
-   ('ru',    'RUS'),
-   ('sk',    'SK' ),
-   ('sl',    'SVN'),
-   ('sv',    'SWE')
+   ('be',       'BEL'),
+   ('bg',       'BUL'),
+   ('ca',       'CAT'),
+   ('zh_CN',    'CHN'),
+   ('cs',       'CZ' ),
+   ('da',       'DAN'),
+   ('de',       'DEU'),
+   ('nl',       'DUT'),
+   ('el',       'ELL'),
+   ('es',       'ESP'),
+   ('fr',       'FRA'),
+   ('hr',       'HR' ),
+   ('hu',       'HUN'),
+   ('it',       'ITA'),
+   ('ja',       'JPN'),
+   ('ko',       'KOR'),
+   ('nb',       'NOR'),
+   ('nn',       'NOR'),
+   ('pl',       'POL'),
+   ('pt',       'POR'),
+   ('pt_BR',    'PTG'),
+   ('ro',       'ROM'),
+   ('ru',       'RUS'),
+   ('sk',       'SK' ),
+   ('sr',       'SRB'),
+   ('sr@latin', 'SRL'),
+   ('sl',       'SVN'),
+   ('sv',       'SWE'),
+   ('tr',       'TUR'),
+   ('zh_TW',    'TW' ),
+   ('uk',       'UKR')
   );
 
 function GetWdxLang(const Code: String): String;
@@ -773,6 +787,7 @@ function TPluginWDX.CallContentGetValueV(FileName: String; FieldIndex,
   UnitIndex: Integer; flags: Integer): Variant;
 var
   Rez: Integer;
+  ATime: TDateTime;
   Buf: array[0..WDX_MAX_LEN] of Byte;
   fnval: Integer absolute buf;
   fnval64: Int64 absolute buf;
@@ -793,8 +808,20 @@ begin
       ft_numeric_32: Result := fnval;
       ft_numeric_64: Result := fnval64;
       ft_numeric_floating: Result := ffval;
-      ft_date: Result := EncodeDate(fdate.wYear, fdate.wMonth, fdate.wDay);
-      ft_time: Result := EncodeTime(ftime.wHour, ftime.wMinute, ftime.wSecond, 0);
+      ft_date:
+        begin
+          if TryEncodeDate(fdate.wYear, fdate.wMonth, fdate.wDay, ATime) then
+            Result := ATime
+          else
+            Result := Unassigned;
+        end;
+      ft_time:
+        begin
+          if TryEncodeTime(ftime.wHour, ftime.wMinute, ftime.wSecond, 0, ATime) then
+            Result := ATime
+          else
+            Result := Unassigned;
+        end;
       ft_datetime: Result :=  WinFileTimeToDateTime(wtime);
       ft_boolean: Result := Boolean(fnval);
 

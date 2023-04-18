@@ -3,7 +3,7 @@
     -------------------------------------------------------------------------
     This unit contains platform dependent functions dealing with operating system.
 
-    Copyright (C) 2006-2021 Alexander Koblov (alexx2000@mail.ru)
+    Copyright (C) 2006-2023 Alexander Koblov (alexx2000@mail.ru)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -30,6 +30,9 @@ uses
   SysUtils, Classes, DynLibs, DCClassesUtf8, DCBasicTypes, DCConvertEncoding
 {$IFDEF UNIX}
   , BaseUnix, DCUnix
+{$ENDIF}
+{$IFDEF HAIKU}
+  , DCHaiku
 {$ENDIF}
 {$IFDEF MSWINDOWS}
   , JwaWinBase, Windows
@@ -139,10 +142,10 @@ function FileIsReadOnly(iAttr: TFileAttrs): Boolean; inline;
           The directories in this path are not created if they don't exist.
           If it is empty then the system temporary directory is used.
           For example:
-            If PathPrefix is '/tmp/myfile' then files '/tmp/myfileXXXXXX' are tried.
+            If PathPrefix is '/tmp/myfile' then files '/tmp/myfile~XXXXXX.tmp' are tried.
             The path '/tmp' must already exist.)
 }
-function GetTempName(PathPrefix: String): String;
+function GetTempName(PathPrefix: String; Extension: String = 'tmp'): String;
 
 (* File mapping/unmapping routines *)
 {en
@@ -237,6 +240,7 @@ function mbGetEnvironmentString(Index : Integer) : String;
 function mbExpandEnvironmentStrings(const FileName: String): String;
 function mbGetEnvironmentVariable(const sName: String): String;
 function mbSetEnvironmentVariable(const sName, sValue: String): Boolean;
+function mbUnsetEnvironmentVariable(const sName: String): Boolean;
 function mbSysErrorMessage: String; overload; inline;
 function mbSysErrorMessage(ErrorCode: Integer): String; overload;
 {en
@@ -244,6 +248,7 @@ function mbSysErrorMessage(ErrorCode: Integer): String; overload;
 }
 function mbGetModuleName(Address: Pointer = nil): String;
 function mbLoadLibrary(const Name: String): TLibHandle;
+function mbLoadLibraryEx(const Name: String): TLibHandle;
 function SafeGetProcAddress(Lib: TLibHandle; const ProcName: AnsiString): Pointer;
 {en
    Reads the concrete file's name that the link points to.
@@ -374,7 +379,7 @@ begin
 end;
 {$ELSE}
 begin
-  Result := BaseUnix.FPS_ISDIR(iAttr);
+  Result := BaseUnix.FPS_ISDIR(TMode(iAttr));
 end;
 {$ENDIF}
 
@@ -387,7 +392,7 @@ begin
 end;
 {$ELSE}
 begin
-  Result := BaseUnix.FPS_ISLNK(iAttr);
+  Result := BaseUnix.FPS_ISLNK(TMode(iAttr));
 end;
 {$ENDIF}
 
@@ -537,11 +542,11 @@ end;
 {$ELSE}  // *nix
 var
   Option: TCopyAttributesOption;
-  StatInfo : BaseUnix.Stat;
+  StatInfo : TDCStat;
   utb : BaseUnix.TUTimBuf;
   mode : TMode;
 begin
-  if fpLStat(UTF8ToSys(sSrc), StatInfo) < 0 then
+  if DC_fpLStat(UTF8ToSys(sSrc), StatInfo) < 0 then
   begin
     Result := Options;
     if Assigned(Errors) then
@@ -563,18 +568,43 @@ begin
           if Assigned(Errors) then Errors^[caoCopyOwnership]:= GetLastOSError;
         end;
       end;
+{$IF DEFINED(HAIKU)}
+      if caoCopyXattributes in Options then
+      begin
+        if not mbFileCopyXattr(sSrc, sDst) then
+        begin
+          Include(Result, caoCopyXattributes);
+          if Assigned(Errors) then Errors^[caoCopyXattributes]:= GetLastOSError;
+        end;
+      end;
+{$ENDIF}
     end
     else
     begin
       if caoCopyTime in Options then
       begin
         utb.actime  := time_t(StatInfo.st_atime);  // last access time
+{$IF DEFINED(DARWIN)}
+        utb.modtime := time_t(StatInfo.st_birthtime);  // creation time
+{$ELSE}
+        utb.modtime := time_t(StatInfo.st_mtime);  // last modification time
+{$ENDIF}
+        if fputime(UTF8ToSys(sDst), @utb) <> 0 then
+        begin
+          Include(Result, caoCopyTime);
+          if Assigned(Errors) then Errors^[caoCopyTime]:= GetLastOSError;
+        end;
+{$IF DEFINED(DARWIN)}
+        // creation time supported in MacOS:
+        // 1. the first call fputime above: set creation time
+        // 2. the second call here: set modification time
         utb.modtime := time_t(StatInfo.st_mtime);  // last modification time
         if fputime(UTF8ToSys(sDst), @utb) <> 0 then
         begin
           Include(Result, caoCopyTime);
           if Assigned(Errors) then Errors^[caoCopyTime]:= GetLastOSError;
         end;
+{$ENDIF}
       end;
 
       if caoCopyOwnership in Options then
@@ -598,7 +628,7 @@ begin
         end;
       end;
 
-{$IFDEF LINUX}
+{$IF DEFINED(LINUX) or DEFINED(HAIKU)}
       if caoCopyXattributes in Options then
       begin
         if not mbFileCopyXattr(sSrc, sDst) then
@@ -613,7 +643,7 @@ begin
 end;
 {$ENDIF}
 
-function GetTempName(PathPrefix: String): String;
+function GetTempName(PathPrefix: String; Extension: String): String;
 const
   MaxTries = 100;
 var
@@ -623,12 +653,18 @@ begin
   if PathPrefix = '' then
     PathPrefix := GetTempDir
   else begin
-    FileName:= ExtractFileName(PathPrefix);
+    FileName:= ExtractOnlyFileName(PathPrefix);
+    PathPrefix:= ExtractFilePath(PathPrefix);
     // Generated file name should be less the maximum file name length
-    PathPrefix:= ExtractFilePath(PathPrefix) + UTF8Copy(FileName, 1, 48);
+    if (Length(FileName) > 0) then PathPrefix += UTF8Copy(FileName, 1, 48) + '~';
+  end;
+  if (Length(Extension) > 0) then
+  begin
+    if (not StrBegins(Extension, ExtensionSeparator)) then
+      Extension := ExtensionSeparator + Extension;
   end;
   repeat
-    Result := PathPrefix + IntToStr(System.Random(MaxInt)); // or use CreateGUID()
+    Result := PathPrefix + IntToStr(System.Random(MaxInt)) + Extension;
     Inc(TryNumber);
     if TryNumber = MaxTries then
       Exit('');
@@ -878,14 +914,18 @@ begin
 end;
 {$ELSE}
 var
-  StatInfo : BaseUnix.Stat;
+  StatInfo : TDCStat;
 begin
-  Result := fpLStat(UTF8ToSys(FileName), StatInfo) >= 0;
+  Result := DC_fpLStat(UTF8ToSys(FileName), StatInfo) >= 0;
   if Result then
   begin
     LastAccessTime   := StatInfo.st_atime;
     ModificationTime := StatInfo.st_mtime;
+    {$IF DEFINED(DARWIN)}
+    CreationTime     := StatInfo.st_birthtime;
+    {$ELSE}
     CreationTime     := StatInfo.st_ctime;
+    {$ENDIF}
   end;
 end;
 {$ENDIF}
@@ -1631,6 +1671,20 @@ begin
 end;
 {$ENDIF}
 
+function mbUnsetEnvironmentVariable(const sName: String): Boolean;
+{$IFDEF MSWINDOWS}
+var
+  wsName: UnicodeString;
+begin
+  wsName:= CeUtf8ToUtf16(sName);
+  Result:= SetEnvironmentVariableW(PWideChar(wsName), NIL);
+end;
+{$ELSE}
+begin
+  Result:= (unsetenv(PAnsiChar(CeUtf8ToSys(sName))) = 0);
+end;
+{$ENDIF}
+
 function mbSysErrorMessage: String;
 begin
   Result := mbSysErrorMessage(GetLastOSError);
@@ -1689,6 +1743,45 @@ begin
     Result:= LoadLibraryW(PWideChar(CeUtf8ToUtf16(Name)));
   finally
     SetCurrentDir(sRememberPath);
+  end;
+end;
+{$ELSE}
+begin
+  Result:= TLibHandle(dlopen(PChar(UTF8ToSys(Name)), RTLD_LAZY));
+end;
+{$ENDIF}
+
+function mbLoadLibraryEx(const Name: String): TLibHandle;
+{$IF DEFINED(MSWINDOWS)}
+const
+  PATH_ENV = 'PATH';
+var
+  APath: String;
+  usName: UnicodeString;
+begin
+  usName:= CeUtf8ToUtf16(Name);
+
+  if CheckWin32Version(10)then
+  begin
+    Result:= LoadLibraryExW(PWideChar(usName), 0, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR or LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+  end
+  else if CheckWin32Version(6) then
+  begin
+    SetDllDirectoryW(PWideChar(ExtractFileDir(usName)));
+    try
+      Result:= LoadLibraryW(PWideChar(usName));
+    finally
+      SetDllDirectoryW(nil);
+    end;
+  end
+  else begin
+    APath:= mbGetEnvironmentVariable(PATH_ENV);
+    try
+      mbSetEnvironmentVariable(PATH_ENV, ExtractFileDir(Name));
+      Result:= LoadLibraryW(PWideChar(usName));
+    finally
+      mbSetEnvironmentVariable(PATH_ENV, APath);
+    end;
   end;
 end;
 {$ELSE}

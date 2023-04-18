@@ -8,7 +8,7 @@ object frmFileProperties: TfrmFileProperties
   ChildSizing.LeftRightSpacing = 8
   ClientHeight = 471
   ClientWidth = 458
-  Constraints.MinHeight = 432
+  Constraints.MinHeight = 450
   Constraints.MinWidth = 458
   KeyPreview = True
   OnCreate = FormCreate
@@ -64,6 +64,7 @@ object frmFileProperties: TfrmFileProperties
             Height = 32
             Top = 0
             Width = 32
+            Stretch = True
           end
         end
         object lblFileName: TLabel
@@ -283,6 +284,32 @@ object frmFileProperties: TfrmFileProperties
           Height = 23
           Top = 241
           Width = 25
+          DrawStyle = dsExtra1
+          Lines.Strings = (
+            '???'
+          )
+          ReadOnly = True
+        end
+       object lblCreatedStr: TLabel
+          AnchorSideTop.Side = asrBottom
+          Left = 10
+          Height = 17
+          Top = 261
+          Width = 119
+          BorderSpacing.Top = 2
+          BorderSpacing.CellAlignVertical = ccaCenter
+          Caption = 'Created:'
+          ParentColor = False
+        end
+        object lblCreated: TKASCDEdit
+          AnchorSideTop.Side = asrBottom
+          AnchorSideRight.Side = asrBottom
+          Cursor = crIBeam
+          Left = 128
+          Height = 23
+          Top = 258
+          Width = 25
+          AutoSize = True
           DrawStyle = dsExtra1
           Lines.Strings = (
             '???'
@@ -616,6 +643,7 @@ object frmFileProperties: TfrmFileProperties
         BorderSpacing.Right = 8
         Font.Style = [fsBold]
         ParentFont = False
+        Style = gsHorLines
       end
       object DividerBevel2: TDividerBevel
         AnchorSideLeft.Control = DividerBevel1
@@ -631,6 +659,7 @@ object frmFileProperties: TfrmFileProperties
         BorderSpacing.Top = 2
         Font.Style = [fsBold]
         ParentFont = False
+        Style = gsHorLines
       end
     end
     object tsPlugins: TTabSheet
@@ -785,7 +814,6 @@ object frmFileProperties: TfrmFileProperties
     BorderSpacing.Bottom = 4
     Caption = 'Ski&p this file'
     Kind = bkIgnore
-    ModalResult = 5
     OnClick = btnSkipFileClick
     TabOrder = 4
   end

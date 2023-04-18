@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    Internal diff and merge tool
 
-   Copyright (C) 2010-2022 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2010-2023 Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License as
@@ -366,7 +366,7 @@ begin
     end
     else try
       Inc(ScrollLock);
-      Screen.Cursor := crHourGlass;
+      Screen.BeginWaitCursor;
 
       if SynDiffEditLeft.Modified then SynDiffEditLeft.Lines.RemoveFake;
       if SynDiffEditRight.Modified then SynDiffEditRight.Lines.RemoveFake;
@@ -447,9 +447,9 @@ begin
     finally
       SynDiffEditLeft.FinishCompare;
       SynDiffEditRight.FinishCompare;
-      Screen.Cursor := crDefault;
       actStartCompare.Enabled := True;
       actCancelCompare.Enabled := False;
+      Screen.EndWaitCursor;
       Dec(ScrollLock);
     end;
     if actLineDifferences.Checked then
@@ -780,6 +780,7 @@ begin
 
   // Load settings
   actIgnoreCase.Checked := gDifferIgnoreCase;
+  actAutoCompare.Checked := gDifferAutoCompare;
   actKeepScrolling.Checked := gDifferKeepScrolling;
   actLineDifferences.Checked := gDifferLineDifferences;
   actPaintBackground.Checked := gDifferPaintBackground;
@@ -1004,6 +1005,7 @@ begin
   CloseAction:= caFree;
   // Save settings
   gDifferIgnoreCase := actIgnoreCase.Checked;
+  gDifferAutoCompare := actAutoCompare.Checked;
   gDifferKeepScrolling := actKeepScrolling.Checked;
   gDifferLineDifferences := actLineDifferences.Checked;
   gDifferPaintBackground := actPaintBackground.Checked;
@@ -1143,10 +1145,13 @@ begin
   if not actBinaryCompare.Checked then
   begin
     if gFirstTextSearch then
-      ShowSearchReplaceDialog(Self, SynDiffEditActive, cbUnchecked, FSearchOptions)
+    begin
+      FSearchOptions.Flags -= [ssoBackwards];
+      ShowSearchReplaceDialog(Self, SynDiffEditActive, cbUnchecked, FSearchOptions);
+    end
     else if FSearchOptions.SearchText <> '' then
     begin
-      DoSearchReplaceText(SynDiffEditActive, False, ssoBackwards in FSearchOptions.Flags, FSearchOptions);
+      DoSearchReplaceText(SynDiffEditActive, False, False, FSearchOptions);
       FSearchOptions.Flags -= [ssoEntireScope];
     end;
   end;

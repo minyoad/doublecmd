@@ -62,7 +62,7 @@ uses
   AbVMStrm,
   AbDfBase,
   AbZlibPrc,
-  AbXzPrc,
+  AbZipxPrc,
   DCClassesUtf8;
 
 
@@ -186,11 +186,15 @@ procedure DoZipFromStream(Sender : TAbZipArchive; Item : TAbZipItem;
   OutStream, InStream : TStream);
 var
   ZipArchive : TAbZipArchive;
-  InStartPos : LongInt;
+  InStartPos : Int64;
+  OutStartPos : Int64;
   TempOut : TAbVirtualMemoryStream;
   DestStrm : TStream;
 begin
   ZipArchive := TAbZipArchive(Sender);
+
+  { save starting point }
+  OutStartPos := OutStream.Position;
 
   { configure Item }
   Item.UncompressedSize := InStream.Size;
@@ -206,7 +210,13 @@ begin
     if InStream.Size > 0 then begin
 
       if SameText(ExtractFileExt(Sender.ArchiveName), '.zipx') then
-        DoCompressXz(ZipArchive, Item, DestStrm, InStream)
+      begin
+        case ZipArchive.CompressionMethod of
+          IntPtr(cmXz):   DoCompressXz(ZipArchive, Item, DestStrm, InStream);
+          IntPtr(cmZstd): DoCompressZstd(ZipArchive, Item, DestStrm, InStream);
+          else raise Exception.Create(EmptyStr);
+        end;
+      end
       else
       { determine how to store Item based on specified CompressionMethodToUse }
       case ZipArchive.CompressionMethodToUse of
@@ -268,7 +278,7 @@ begin
   end;
 
   { update item }
-  Item.CompressedSize := OutStream.Size;
+  Item.CompressedSize := OutStream.Position - OutStartPos;
   Item.InternalFileAttributes := 0; { don't care }
   if (ZipArchive.Password <> '') then
     Item.GeneralPurposeBitFlag := Item.GeneralPurposeBitFlag

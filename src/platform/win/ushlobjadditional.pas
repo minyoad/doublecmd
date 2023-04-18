@@ -68,9 +68,26 @@ type
       function GetOverlayIconIndex(pidl : PItemIDList; var IconIndex : Integer) : HResult; stdcall;
    end; { IShellIconOverlay }
 
+{$IF FPC_FULLVERSION < 30200}
+   PSHColumnID = ^TSHColumnID;
+
+   IShellFolder2 = interface(IShellFolder)
+      ['{93F2F68C-1D1B-11d3-A30E-00C04F79ABD1}']
+      function GetDefaultSearchGUID(out guid:TGUID):HResult;StdCall;
+      function EnumSearches(out ppenum:IEnumExtraSearch):HResult;StdCall;
+      function GetDefaultColumn(dwres:DWORD;psort :pulong; pdisplay:pulong):HResult;StdCall;
+      function GetDefaultColumnState(icolumn:UINT;pscflag:PSHCOLSTATEF):HResult;StdCall;
+      function GetDetailsEx(pidl:LPCITEMIDLIST;pscid:PSHCOLUMNID; pv : pOLEvariant):HResult;StdCall;
+      function GetDetailsOf(pidl:LPCITEMIDLIST;iColumn:UINT;psd:PSHELLDETAILS):HResult;StdCall;
+      function MapColumnToSCID(iColumn:UINT;pscid:PSHCOLUMNID):HResult;StdCall;
+   end;
+{$ENDIF}
+
 const
   SIID_DRIVENET = 9;
   SIID_ZIPFILE = 105;
+
+  PKEY_StorageProviderState: PROPERTYKEY = (fmtid: '{E77E90DF-6271-4F5B-834F-2DD1F245DDA4}'; pid: 3);
 
 type
   TSHStockIconInfo = record
@@ -84,18 +101,15 @@ type
 function SHGetSystemImageList(iImageList: Integer): HIMAGELIST;
 function SHGetStockIconInfo(siid: Int32; uFlags: UINT; out psii: TSHStockIconInfo): Boolean;
 function SHChangeIconDialog(hOwner: HWND; var FileName: String; var IconIndex: Integer): Boolean;
+function SHGetStorePropertyValue(const FileName: String; const Key: PROPERTYKEY): Integer;
 function SHGetOverlayIconIndex(const sFilePath, sFileName: String): Integer;
 function SHGetInfoTip(const sFilePath, sFileName: String): String;
 function SHFileIsLinkToFolder(const FileName: String; out LinkTarget: String): Boolean;
 
 function SHGetFolderLocation(hwnd: HWND; csidl: Longint; hToken: HANDLE; dwFlags: DWORD; var ppidl: LPITEMIDLIST): HRESULT; stdcall; external shell32 name 'SHGetFolderLocation';
 
-function PathIsUNCA(pszPath: LPCSTR): WINBOOL; stdcall; external 'shlwapi' name 'PathIsUNCA';
 function PathIsUNCW(pwszPath: LPCWSTR): WINBOOL; stdcall; external 'shlwapi' name 'PathIsUNCW';
-
-function PathFindNextComponentA(pszPath: LPCSTR): LPSTR; stdcall; external 'shlwapi' name 'PathFindNextComponentA';
 function PathFindNextComponentW(pwszPath: LPCWSTR): LPWSTR; stdcall; external 'shlwapi' name 'PathFindNextComponentW';
-
 function StrRetToBufW(pstr: PSTRRET; pidl: PItemIDList; pszBuf: LPWSTR; cchBuf: UINT): HRESULT; stdcall; external 'shlwapi.dll';
 
 procedure OleErrorUTF8(ErrorCode: HResult);
@@ -104,7 +118,12 @@ procedure OleCheckUTF8(Result: HResult);
 implementation
 
 uses
-  SysUtils, JwaShlGuid, ComObj, LazUTF8, DCOSUtils;
+  SysUtils, JwaShlGuid, ComObj, LazUTF8, DCOSUtils, DCConvertEncoding;
+
+var
+  SHGetPropertyStoreFromParsingName: function(pszPath: PCWSTR; const pbc: IBindCtx;
+                                              flags: GETPROPERTYSTOREFLAGS;
+                                              const riid: TIID; out ppv): HRESULT; stdcall;
 
 function SHGetImageListFallback(iImageList: Integer; const riid: TGUID; var ImageList: HIMAGELIST): HRESULT; stdcall;
 var
@@ -176,11 +195,24 @@ begin
     @SHChangeIconW := Windows.GetProcAddress(ShellHandle, PAnsiChar(62));
     if Assigned(SHChangeIconW) then
     begin
-      FileNameW := UTF8Decode(FileName);
+      FileNameW := CeUtf8ToUtf16(FileName);
       Result := SHChangeIconW(hOwner, FileNameW, SizeOf(FileNameW), IconIndex);
       if Result then FileName := UTF16ToUTF8(UnicodeString(FileNameW));
     end
   end;
+end;
+
+function SHGetStorePropertyValue(const FileName: String; const Key: PROPERTYKEY): Integer;
+var
+  AValue: Variant;
+  AStorage: IPropertyStore;
+begin
+  if Succeeded(SHGetPropertyStoreFromParsingName(PWideChar(CeUtf8ToUtf16(FileName)), nil, GPS_DEFAULT, IPropertyStore, AStorage)) then
+  begin
+    if Succeeded(AStorage.GetValue(@Key, TPROPVARIANT(AValue))) then
+      Exit(AValue);
+  end;
+  Result:= -1;
 end;
 
 function SHGetOverlayIconIndex(const sFilePath, sFileName: String): Integer;
@@ -198,7 +230,7 @@ begin
 
   if SHGetDesktopFolder(DesktopFolder) = S_OK then
   begin
-    wsTemp:= UTF8Decode(sFilePath);
+    wsTemp:= CeUtf8ToUtf16(sFilePath);
     if DesktopFolder.ParseDisplayName(0, nil, PWideChar(wsTemp), pchEaten, ParentPidl, dwAttributes) = S_OK then
     begin
       if DesktopFolder.BindToObject(ParentPidl, nil, IID_IShellFolder, Folder) = S_OK then
@@ -210,7 +242,7 @@ begin
         if Folder.QueryInterface(IID_IShellIconOverlay, IconOverlay) = S_OK then
           begin
             // Get a pidl for the file.
-            wsTemp:= UTF8Decode(sFileName);
+            wsTemp:= CeUtf8ToUtf16(sFileName);
             if Folder.ParseDisplayName(0, nil, PWideChar(wsTemp), pchEaten, Pidl, dwAttributes) = S_OK then
             begin
               // Get the overlay icon index.
@@ -246,11 +278,11 @@ begin
   Result:= EmptyStr;
   if Succeeded(SHGetDesktopFolder(DesktopFolder)) then
     try
-      wsTemp:= UTF8Decode(sFilePath);
+      wsTemp:= CeUtf8ToUtf16(sFilePath);
       if Succeeded(DesktopFolder.ParseDisplayName(0, nil, PWideChar(wsTemp), pchEaten, pidlFolder, dwAttributes)) then
         if Succeeded(DesktopFolder.BindToObject(pidlFolder, nil, IID_IShellFolder, Folder)) then
           try
-            wsTemp:= UTF8Decode(sFileName);
+            wsTemp:= CeUtf8ToUtf16(sFileName);
             if Succeeded(Folder.ParseDisplayName(0, nil, PWideChar(wsTemp), pchEaten, pidlFile, dwAttributes)) then
               if Succeeded(Folder.GetUIObjectOf(0, 1, pidlFile, IID_IQueryInfo, nil, queryInfo)) then
                 if Succeeded(queryInfo.GetInfoTip(QITIPF_USESLOWTIP, ppwszTip)) then
@@ -283,7 +315,7 @@ begin
     Unknown := CreateComObject(CLSID_ShellLink);
     ShellLink := Unknown as IShellLinkW;
     PersistFile := Unknown as IPersistFile;
-    if Failed(PersistFile.Load(PWideChar(UTF8Decode(FileName)), OF_READ)) then Exit;
+    if Failed(PersistFile.Load(PWideChar(CeUtf8ToUtf16(FileName)), OF_READ)) then Exit;
     pszFile:= GetMem(MAX_PATH * 2);
     try
       if Failed(ShellLink.GetPath(pszFile, MAX_PATH, @FindData, 0)) then Exit;
@@ -309,5 +341,9 @@ procedure OleCheckUTF8(Result: HResult);
 begin
   if not Succeeded(Result) then OleErrorUTF8(Result);
 end;
+
+initialization
+  SHGetPropertyStoreFromParsingName:= GetProcAddress(GetModuleHandle('shell32.dll'),
+                                                     'SHGetPropertyStoreFromParsingName');
 
 end. { ShlObjAdditional }

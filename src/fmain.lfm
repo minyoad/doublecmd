@@ -21,7 +21,6 @@ object frmMain: TfrmMain
   ShowHint = True
   ShowInTaskBar = stAlways
   LCLVersion = '1.8.4.0'
-  Visible = True
   object MainToolbar: TKASToolBar
     AnchorSideTop.Control = Owner
     Left = 0
@@ -473,7 +472,9 @@ object frmMain: TfrmMain
     Align = alBottom
     AutoSnap = False
     OnCanResize = ConsoleSplitterCanResize
+    OnMoved = ConsoleSplitterMoved
     ResizeAnchor = akBottom
+    ResizeStyle = rsLine
     Visible = False
   end
   object pnlCommand: TPanel
@@ -1195,6 +1196,9 @@ object frmMain: TfrmMain
       object miRunTerm: TMenuItem
         Action = actRunTerm
       end
+      object mnuDoAnyCmCommand: TMenuItem
+        Action = actDoAnyCmCommand
+      end
       object miLine9: TMenuItem
         Caption = '-'
       end
@@ -1492,6 +1496,7 @@ object frmMain: TfrmMain
       Tag = 16
       Category = 'Window'
       Caption = '&Horizontal Panels Mode'
+      GroupIndex = 5
       OnExecute = actExecute
     end
     object actPanelsSplitterPerPos: TAction
@@ -1650,6 +1655,7 @@ object frmMain: TfrmMain
       Category = 'View'
       Caption = 'Show &Hidden/System Files'
       Checked = True
+      GroupIndex = 2
       HelpType = htKeyword
       OnExecute = actExecute
     end
@@ -1924,10 +1930,23 @@ object frmMain: TfrmMain
       Caption = 'Switch to &Previous Tab'
       OnExecute = actExecute
     end
+    object actMoveTabLeft: TAction
+      Tag = 21
+      Category = 'Tabs'
+      Caption = 'Move current tab to the left'
+      OnExecute = actExecute
+    end
+    object actMoveTabRight: TAction
+      Tag = 21
+      Category = 'Tabs'
+      Caption = 'Move current tab to the right'
+      OnExecute = actExecute
+    end
     object actSwitchIgnoreList: TAction
       Tag = 19
       Category = 'View'
       Caption = 'Enable/disable ignore list file to not show file names'
+      GroupIndex = 4
       OnExecute = actExecute
     end
     object actCopyNamesToClip: TAction
@@ -1988,6 +2007,12 @@ object frmMain: TfrmMain
       Tag = 6
       Category = 'Network'
       Caption = 'Network &Disconnect'
+      OnExecute = actExecute
+    end
+    object actCopyNetNamesToClip: TAction
+      Tag = 6
+      Category = 'Network'
+      Caption = 'Copy names with UNC path'
       OnExecute = actExecute
     end
     object actCopyPathOfFilesToClip: TAction
@@ -2159,6 +2184,14 @@ object frmMain: TfrmMain
       HelpType = htKeyword
       OnExecute = actExecute
     end
+    object actSyncChangeDir: TAction
+      Tag = 14
+      Category = 'Navigation'
+      Caption = 'Synchronous navigation'
+      Hint = 'Synchronous directory changing in both panels'
+      GroupIndex = 7
+      OnExecute = actExecute
+    end
     object actChangeDirToParent: TAction
       Tag = 14
       Category = 'Navigation'
@@ -2210,21 +2243,27 @@ object frmMain: TfrmMain
     object actBriefView: TAction
       Tag = 1
       Category = 'Active Panel'
+      AutoCheck = True
       Caption = 'Brief view'
+      GroupIndex = 6
       Hint = 'Brief View'
       OnExecute = actExecute
     end
     object actColumnsView: TAction
       Tag = 1
       Category = 'Active Panel'
+      AutoCheck = True
       Caption = 'Full'
+      GroupIndex = 6
       Hint = 'Columns View'
       OnExecute = actExecute
     end
     object actThumbnailsView: TAction
       Tag = 1
       Category = 'Active Panel'
+      AutoCheck = True
       Caption = 'Thumbnails'
+      GroupIndex = 6
       Hint = 'Thumbnails View'
       OnExecute = actExecute
     end
@@ -2244,6 +2283,7 @@ object frmMain: TfrmMain
       Tag = 1
       Category = 'Active Panel'
       Caption = '&Quick View Panel'
+      GroupIndex = 1
       OnExecute = actExecute
     end
     object actSortByName: TAction
@@ -2292,6 +2332,7 @@ object frmMain: TfrmMain
       Tag = 1
       Category = 'Active Panel'
       Caption = 'Open drive list'
+      OnExecute = actExecute
     end
     object actExchange: TAction
       Tag = 14
@@ -2461,7 +2502,8 @@ object frmMain: TfrmMain
     object actDoAnyCmCommand: TAction
       Tag = 18
       Category = 'Tools'
-      Caption = 'Select any command and execute it'
+      Caption = 'Execute &internal command...'
+      Hint = 'Select any command and execute it'
       OnExecute = actExecute
     end
     object actSetFileProperties: TAction
@@ -2556,6 +2598,7 @@ object frmMain: TfrmMain
       Tag = 16
       Category = 'Window'
       Caption = '&Tree View Panel'
+      GroupIndex = 3
       OnExecute = actExecute
     end
     object actFocusTreeView: TAction
@@ -2777,6 +2820,13 @@ object frmMain: TfrmMain
       Tag = 5
       Category = 'Configuration'
       Caption = 'Add Plugin'
+      OnExecute = actExecute
+    end
+    object actLoadList: TAction
+      Tag = 7
+      Category = 'Miscellaneous'
+      Caption = 'Load List'
+      Hint = 'Load list of files/folders from the specified text file'
       OnExecute = actExecute
     end
   end

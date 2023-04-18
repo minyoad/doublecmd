@@ -193,6 +193,9 @@ type
   private
     property SortIndex: Integer read FSortIndex write SetSortIndex;
     property Commands: TFormCommands read FCommands implements IFormCommands;
+  protected
+    procedure DoAutoAdjustLayout(const AMode: TLayoutAdjustmentPolicy;
+                                 const AXProportion, AYProportion: Double); override;
   public
     { public declarations }
     constructor Create(AOwner: TComponent;
@@ -234,7 +237,7 @@ uses
   DCClassesUtf8, uFileSystemFileSource, uFileSourceOperationOptions, DCDateTimeUtils,
   uDCUtils, uFileSourceUtil, uFileSourceOperationTypes, uShowForm, uAdministrator,
   uOSUtils, uLng, uMasks, Math, uClipboard, IntegerList, fMaskInputDlg, uSearchTemplate,
-  StrUtils, uTypes;
+  StrUtils, uTypes, uFileSystemDeleteOperation;
 
 {$R *.lfm}
 
@@ -564,6 +567,7 @@ begin
   DeleteLeftCount := 0; DeleteRightCount := 0;
   CopyLeftCount := 0; CopyRightCount := 0;
   CopyLeftSize := 0;  CopyRightSize := 0;
+
   for i := 0 to FVisibleItems.Count - 1 do
     if Assigned(FVisibleItems.Objects[i]) then
     begin
@@ -639,8 +643,14 @@ begin
       CopyRight := chkLeftToRight.Checked;
       DeleteLeft := chkDeleteLeft.Checked;
       DeleteRight := chkDeleteRight.Checked;
+
+      lblProgress.Caption := rsOperCopying;
+      lblProgressDelete.Caption := rsOperDeleting;
+      ProgressBar.Position:=0;
+      ProgressBarDelete.Position:=0;
       pnlCopyProgress.Visible:= CopyLeft or CopyRight;
       pnlDeleteProgress.Visible:= DeleteLeft or DeleteRight;
+
       i := 0;
       while i < FVisibleItems.Count do
       begin
@@ -784,6 +794,10 @@ begin
     FIniPropStorage.StoredValues.Add.DisplayName:= Format(GRID_COLUMN_FMT, [Index]);
   end;
 
+  {$IFDEF LCLCOCOA}
+  pnlProgress.Color:=clBtnHighlight;
+  {$ENDIF}
+
   lblProgress.Caption    := rsOperCopying;
   lblProgressDelete.Caption   := rsOperDeleting;
   { settings }
@@ -845,7 +859,9 @@ begin
       FillRect(aRect);
       Font.Bold := True;
       Font.Color := clWindowText;
-      TextOut(aRect.Left + 2, aRect.Top + 2, FVisibleItems[aRow]);
+      with hCols[0] do
+        TextRect(Rect(Left, aRect.Top, Left + Width, aRect.Bottom),
+          Left + 2, aRect.Top + 2, FVisibleItems[aRow]);
     end else begin
       case r.FState of
       srsNotEq:       Font.Color := gSyncUnknownColor;
@@ -857,10 +873,15 @@ begin
       end;
       if Assigned(r.FFileL) then
       begin
-        TextOut(aRect.Left + 2, aRect.Top + 2, FVisibleItems[aRow]);
+        with hCols[0] do
+          TextRect(Rect(Left, aRect.Top, Left + Width, aRect.Bottom),
+            Left + 2, aRect.Top + 2, FVisibleItems[aRow]);
         s := IntToStr(r.FFileL.Size);
-        x := hCols[1].Left + hCols[1].Width - 2 - TextWidth(s);
-        TextOut(x, aRect.Top + 2, s);
+        with hCols[1] do begin
+          x := Left + Width - 8 - TextWidth(s);
+          TextRect(Rect(Left, aRect.Top, Left + Width, aRect.Bottom),
+            x, aRect.Top + 2, s);
+        end;
         s := DateTimeToStr(r.FFileL.ModificationTime);
         with hCols[2] do
           TextRect(Rect(Left, aRect.Top, Left + Width, aRect.Bottom),
@@ -870,8 +891,11 @@ begin
       begin
         TextOut(hCols[6].Left + 2, aRect.Top + 2, FVisibleItems[aRow]);
         s := IntToStr(r.FFileR.Size);
-        x := hCols[5].Left + hCols[5].Width - 2 - TextWidth(s);
-        TextOut(x, aRect.Top + 2, s);
+        with hCols[5] do begin
+          x := Left + Width - 8 - TextWidth(s);
+          TextRect(Rect(Left, aRect.Top, Left + Width, aRect.Bottom),
+            x, aRect.Top + 2, s);
+        end;
         s := DateTimeToStr(r.FFileR.ModificationTime);
         with hCols[4] do
           TextRect(Rect(Left, aRect.Top, Left + Width, aRect.Bottom),
@@ -1088,7 +1112,8 @@ procedure TfrmSyncDirsDlg.FillFoundItemsDG;
         if Assigned(r.FFileL) and not Assigned(r.FFileR) then Inc(FuniqueL) else
         if Assigned(r.FFileR) and not Assigned(r.FFileL) then Inc(FuniqueR);
         if r.FState = srsEqual then Inc(Fequal) else
-        if r.FState = srsNotEq then Inc(Fnoneq);
+        if r.FState = srsNotEq then Inc(Fnoneq) else
+        if Assigned(r.FFileL) and Assigned(r.FFileR) then Inc(Fnoneq);
       end;
     end;
   end;
@@ -1371,17 +1396,14 @@ procedure TfrmSyncDirsDlg.SortFoundItems(sl: TStringList);
   var
     r1, r2: TFileSyncRec;
   begin
-    r1 := TFileSyncRec(sl.Objects[i]);
-    r2 := TFileSyncRec(sl.Objects[j]);
+    if FSortIndex in [1..5] then
+    begin
+      r1 := TFileSyncRec(sl.Objects[i]);
+      r2 := TFileSyncRec(sl.Objects[j]);
+    end;
     case FSortIndex of
     0:
-      if Assigned(r1.FFileL) <> Assigned(r2.FFileL) then
-        Result := Ord(Assigned(r1.FFileL)) - Ord(Assigned(r2.FFileL))
-      else
-      if Assigned(r1.FFileL) then
-        Result := UTF8CompareStr(r1.FFileL.Name, r2.FFileL.Name)
-      else
-        Result := 0;
+      Result := UTF8CompareStr(sl[i], sl[j]);
     1:
       if (Assigned(r1.FFileL) < Assigned(r2.FFileL))
       or Assigned(r2.FFileL) and (r1.FFileL.Size < r2.FFileL.Size) then
@@ -1427,13 +1449,7 @@ procedure TfrmSyncDirsDlg.SortFoundItems(sl: TStringList);
       else
         Result := 0;
     6:
-      if Assigned(r1.FFileR) <> Assigned(r2.FFileR) then
-        Result := Ord(Assigned(r1.FFileR)) - Ord(Assigned(r2.FFileR))
-      else
-      if Assigned(r1.FFileR) then
-        Result := UTF8CompareStr(r1.FFileR.Name, r2.FFileR.Name)
-      else
-        Result := 0;
+      Result := UTF8CompareStr(sl[i], sl[j]);
     end;
     if FSortDesc then
       Result := -Result;
@@ -1707,6 +1723,10 @@ begin
     MessageDlg(rsMsgErrNotSupported, mtError, [mbOK], 0);
     Exit(False);
   end;
+  if (FOperation is TFileSystemDeleteOperation) then
+  begin
+    TFileSystemDeleteOperation(FOperation).Recycle:= gUseTrash;
+  end;
   FOperation.Elevate:= ElevateAction;
   FOperation.AddUserInterface(FFileSourceOperationMessageBoxesUI);
   try
@@ -1798,20 +1818,45 @@ end;
 
 procedure TfrmSyncDirsDlg.SetProgressBytes(AProgressBar: TKASProgressBar;
   CurrentBytes: Int64; TotalBytes: Int64);
+var
+  BarText : String;
+  CaptionText : String;
 begin
-  AProgressBar.SetProgress(CurrentBytes, TotalBytes,
-                           cnvFormatFileSize(CurrentBytes, uoscOperation) + '/' +
-                           cnvFormatFileSize(TotalBytes, uoscOperation)
-                           );
+  BarText := cnvFormatFileSize(CurrentBytes, uoscOperation) + '/' + cnvFormatFileSize(TotalBytes, uoscOperation);
+  AProgressBar.SetProgress(CurrentBytes, TotalBytes, BarText );
+
+  {$IFDEF LCLCOCOA}
+  if TotalBytes > 0 then
+    CaptionText := rsOperCopying + ': ' + BarText + ' (' + FloatToStrF((CurrentBytes / TotalBytes) * 100, ffFixed, 0, 0) + '%)'
+  else
+    CaptionText := rsOperCopying;
+  lblProgress.Caption := CaptionText;
+  {$ENDIF}
 end;
 
 procedure TfrmSyncDirsDlg.SetProgressFiles(AProgressBar: TKASProgressBar;
   CurrentFiles: Int64; TotalFiles: Int64);
+var
+  BarText : String;
+  CaptionText : String;
 begin
-  AProgressBar.SetProgress(CurrentFiles, TotalFiles,
-                           cnvFormatFileSize(CurrentFiles, uoscNoUnit) + '/' +
-                           cnvFormatFileSize(TotalFiles, uoscNoUnit)
-                           );
+  BarText := cnvFormatFileSize(CurrentFiles, uoscNoUnit) + '/' + cnvFormatFileSize(TotalFiles, uoscNoUnit);
+  AProgressBar.SetProgress(CurrentFiles, TotalFiles, BarText );
+
+  {$IFDEF LCLCOCOA}
+  if TotalFiles > 0 then
+    CaptionText := rsOperDeleting + ': ' + BarText + ' (' + FloatToStrF((CurrentFiles / TotalFiles) * 100, ffFixed, 0, 0) + '%)'
+  else
+    CaptionText := rsOperDeleting;
+  lblProgressDelete.Caption := CaptionText;
+  {$ENDIF}
+end;
+
+procedure TfrmSyncDirsDlg.DoAutoAdjustLayout(const AMode: TLayoutAdjustmentPolicy;
+                                             const AXProportion, AYProportion: Double);
+begin
+  inherited DoAutoAdjustLayout(AMode, AXProportion, AYProportion);
+  RecalcHeaderCols;
 end;
 
 constructor TfrmSyncDirsDlg.Create(AOwner: TComponent; FileView1,

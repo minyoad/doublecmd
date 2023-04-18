@@ -4,7 +4,7 @@
    This unit contains DC actions of the main form
 
    Copyright (C) 2008  Dmitry Kolomiets (B4rr4cuda@rambler.ru)
-   Copyright (C) 2008-2020 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2008-2021 Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -210,6 +210,8 @@ type
    procedure cm_CloseDuplicateTabs(const Params: array of string);
    procedure cm_NextTab(const Params: array of string);
    procedure cm_PrevTab(const Params: array of string);
+   procedure cm_MoveTabLeft(const Params: array of string);
+   procedure cm_MoveTabRight(const Params: array of string);
    procedure cm_ActivateTabByIndex(const Params: array of string);
    procedure cm_SaveTabs(const Params: array of string);
    procedure cm_LoadTabs(const Params: array of string);
@@ -319,6 +321,7 @@ type
    procedure cm_CopyToClipboard(const Params: array of string);
    procedure cm_CutToClipboard(const Params: array of string);
    procedure cm_PasteFromClipboard(const Params: array of string);
+   procedure cm_SyncChangeDir(const Params: array of string);
    procedure cm_ChangeDirToRoot(const Params: array of string);
    procedure cm_ChangeDirToHome(const Params: array of string);
    procedure cm_ChangeDirToParent(const Params: array of string);
@@ -327,6 +330,7 @@ type
    procedure cm_ClearLogFile(const Params: array of string);
    procedure cm_NetworkConnect(const Params: array of string);
    procedure cm_NetworkDisconnect(const Params: array of string);
+   procedure cm_CopyNetNamesToClip(const Params: array of string);
    procedure cm_HorizontalFilePanels(const Params: array of string);
    procedure cm_OperationsViewer(const Params: array of string);
    procedure cm_CompareDirectories(const Params: array of string);
@@ -366,6 +370,7 @@ type
    procedure cm_ConfigPlugins(const {%H-}Params: array of string);
    procedure cm_OpenDriveByIndex(const Params: array of string);
    procedure cm_AddPlugin(const Params: array of string);
+   procedure cm_LoadList(const Params: array of string);
 
    // Internal commands
    procedure cm_ExecuteToolbarItem(const Params: array of string);
@@ -380,7 +385,7 @@ uses fOptionsPluginsBase, fOptionsPluginsDSX, fOptionsPluginsWCX,
      fExtractDlg, fAbout, fOptions, fDiffer, fFindDlg, fSymLink, fHardLink, fMultiRename,
      fLinker, fSplitter, fDescrEdit, fCheckSumVerify, fCheckSumCalc, fSetFileProperties,
      uLng, uLog, uShowMsg, uOSForms, uOSUtils, uDCUtils, uBriefFileView, fSelectDuplicates,
-     uShowForm, uShellExecute, uClipboard, uHash, uDisplayFile, uLuaPas,
+     uShowForm, uShellExecute, uClipboard, uHash, uDisplayFile, uLuaPas, uSysFolders,
      uFilePanelSelect, uFileSystemFileSource, uQuickViewPanel, Math,
      uOperationsManager, uFileSourceOperationTypes, uWfxPluginFileSource,
      uFileSystemDeleteOperation, uFileSourceExecuteOperation, uSearchResultFileSource,
@@ -400,6 +405,9 @@ uses fOptionsPluginsBase, fOptionsPluginsDSX, fOptionsPluginsWCX,
      , uColumnsFileView
      {$ENDIF}
      ;
+
+resourcestring
+  rsFavoriteTabs_SetupNotExist = 'No setup named "%s"';
 
 procedure ReadCopyRenameParams(
   const Params: array of string;
@@ -723,6 +731,8 @@ end;
 
 procedure TMainCommands.DoContextMenu(Panel: TFileView; X, Y: Integer; Background: Boolean; UserWishForContextMenu:TUserWishForContextMenu);
 var
+  Index: Integer;
+  AMenu: TPopupMenu;
   aFile: TFile = nil;
   aFiles: TFiles = nil;
   sPath, sName: String;
@@ -731,7 +741,20 @@ begin
   begin
     if not (fspDirectAccess in Panel.FileSource.Properties) then
     begin
-      if not Background then pmContextMenu.PopUp(X, Y);
+      if not Background then
+      begin
+        AMenu:= pmContextMenu;
+        if (fspContextMenu in Panel.FileSource.Properties) then
+        begin
+          aFiles:= Panel.CloneSelectedOrActiveFiles;
+          try
+            Panel.FileSource.QueryContextMenu(aFiles, AMenu);
+          finally
+            FreeAndNil(aFiles);
+          end;
+        end;
+        AMenu.PopUp(X, Y);
+      end;
       Exit;
     end;
 
@@ -765,6 +788,14 @@ begin
     try
       if aFiles.Count > 0 then
       try
+        if fspLinksToLocalFiles in Panel.FileSource.Properties then
+        begin
+          for Index:= 0 to aFiles.Count - 1 do
+          begin
+            aFile:= aFiles[Index];
+            Panel.FileSource.GetLocalName(aFile);
+          end;
+        end;
         ShowContextMenu(frmMain, aFiles, X, Y, Background, nil, UserWishForContextMenu);
       except
         on e: EContextMenuException do
@@ -1313,16 +1344,36 @@ end;
 
 procedure TMainCommands.cm_TestArchive(const Params: array of string);
 var
+  Param: String;
+  BoolValue: Boolean;
   SelectedFiles: TFiles;
+  bConfirmation, HasConfirmationParam: Boolean;
+  QueueId: TOperationsManagerQueueIdentifier = FreeOperationsQueueId;
 begin
   with frmMain do
   begin
-    SelectedFiles := ActiveFrame.CloneSelectedOrActiveFiles;
-    try
-      TestArchive(ActiveFrame, SelectedFiles);
-    finally
-      if Assigned(SelectedFiles) then
+    HasConfirmationParam := False;
+
+    for Param in Params do
+    begin
+      if GetParamBoolValue(Param, 'confirmation', BoolValue) then
+      begin
+        HasConfirmationParam := True;
+        bConfirmation := BoolValue;
+      end;
+    end;
+    if not HasConfirmationParam then begin
+      bConfirmation := focTestArchive in gFileOperationsConfirmations;
+    end;
+
+    if (bConfirmation = False) or (ShowDeleteDialog(rsMsgTestArchive, ActiveFrame.FileSource, QueueId)) then
+    begin
+      SelectedFiles := ActiveFrame.CloneSelectedOrActiveFiles;
+      try
+        TestArchive(ActiveFrame, SelectedFiles, QueueId);
+      finally
         FreeAndNil(SelectedFiles);
+      end;
     end;
   end;
 end;
@@ -1673,6 +1724,18 @@ end;
 procedure TMainCommands.cm_PrevTab(const Params: array of string);
 begin
   frmMain.ActiveNotebook.ActivatePrevTab;
+end;
+
+procedure TMainCommands.cm_MoveTabLeft(const Params: array of string);
+begin
+  with frmMain.ActiveNotebook.ActivePage do
+    if PageIndex > 0 then PageIndex:= PageIndex - 1;
+end;
+
+procedure TMainCommands.cm_MoveTabRight(const Params: array of string);
+begin
+  with frmMain.ActiveNotebook.ActivePage do
+    PageIndex:= PageIndex + 1;
 end;
 
 procedure TMainCommands.cm_ActivateTabByIndex(const Params: array of string);
@@ -3813,14 +3876,7 @@ end;
 
 procedure TMainCommands.cm_ToggleFullscreenConsole(const Params: array of string);
 begin
-  with frmMain do
-  begin
-    ToggleFullscreenConsole;
-    if IsCommandLineVisible then
-    begin
-      edtCommand.SetFocus;
-    end;
-  end;
+  frmMain.ToggleFullscreenConsole;
 end;
 
 procedure TMainCommands.cm_RunTerm(const Params: array of string);
@@ -4278,6 +4334,16 @@ begin
   end;
 end;
 
+procedure TMainCommands.cm_SyncChangeDir(const Params: array of string);
+begin
+  with frmMain do
+  begin
+    actSyncChangeDir.Checked:= not actSyncChangeDir.Checked;
+    if actSyncChangeDir.Checked then
+      SyncChangeDir:= ExcludeTrailingBackslash(ActiveFrame.CurrentPath);
+  end;
+end;
+
 procedure TMainCommands.cm_ChangeDirToRoot(const Params: array of string);
 begin
   DoChangeDirToRoot(frmMain.ActiveFrame);
@@ -4374,6 +4440,11 @@ end;
 procedure TMainCommands.cm_NetworkDisconnect(const Params: array of string);
 begin
   CloseNetworkConnection();
+end;
+
+procedure TMainCommands.cm_CopyNetNamesToClip(const Params: array of string);
+begin
+  CopyNetNamesToClip;
 end;
 
 procedure TMainCommands.cm_HorizontalFilePanels(const Params: array of string);
@@ -4888,6 +4959,8 @@ end;
 
 { TMainCommands.cm_LoadFavoriteTabs }
 procedure TMainCommands.cm_LoadFavoriteTabs(const Params: array of string);
+const
+  sNOSETUPPARAMLEGACY = 'd93525d5-e711-4b9d-ad2c-54d815354819';
 var
   bUseTreeViewMenu: boolean = false;
   bUsePanel: boolean = true;
@@ -4895,31 +4968,62 @@ var
   iWantedWidth: integer = 0;
   iWantedHeight: integer = 0;
   sMaybeMenuItem: TMenuItem = nil;
+  sParam, sMaybeValue, sSearchedFavoriteTabsName: string;
+  iMaybeIndex: integer;
 begin
-  // 1. Let's parse our parameters.
-  DoParseParametersForPossibleTreeViewMenu(Params, gUseTreeViewMenuWithFavoriteTabsFromMenuCommand, gUseTreeViewMenuWithFavoriteTabsFromDoubleClick, bUseTreeViewMenu, bUsePanel, p);
+  // 1. Check if we have the parameter "setup".
+  sSearchedFavoriteTabsName := sNOSETUPPARAMLEGACY;
+  for sParam in Params do
+    if GetParamValue(sParam, 'setup', sMaybeValue) then
+      sSearchedFavoriteTabsName := Trim(sMaybeValue);
 
-  // 2. No matter what, we need to fill in the popup menu structure.
-  gFavoriteTabsList.PopulateMenuWithFavoriteTabs(frmMain.pmFavoriteTabs, @DoOnClickMenuJobFavoriteTabs, ftmp_FAVTABSWITHCONFIG);
-  Application.ProcessMessages;
-
-  // 3. Show the appropriate menu.
-  if bUseTreeViewMenu then
+  // 2. Check if we've seen the 'setup' parameter.
+  if sSearchedFavoriteTabsName = sNOSETUPPARAMLEGACY then
   begin
-    if not bUsePanel then
-      iWantedHeight := 0
+    // If we not see the 'setup' parameter, we do thing as legacy, which means showing the menu to select the favorite tabs so user select it.
+    DoParseParametersForPossibleTreeViewMenu(Params, gUseTreeViewMenuWithFavoriteTabsFromMenuCommand, gUseTreeViewMenuWithFavoriteTabsFromDoubleClick, bUseTreeViewMenu, bUsePanel, p);
+
+    // We fill in the popup menu structure.
+    gFavoriteTabsList.PopulateMenuWithFavoriteTabs(frmMain.pmFavoriteTabs, @DoOnClickMenuJobFavoriteTabs, ftmp_FAVTABSWITHCONFIG);
+    Application.ProcessMessages;
+
+    // Show the appropriate menu.
+    if bUseTreeViewMenu then
+    begin
+      if not bUsePanel then
+        iWantedHeight := 0
+      else
+      begin
+        iWantedWidth := frmMain.ActiveFrame.Width;
+        iWantedHeight := frmMain.ActiveFrame.Height;
+      end;
+
+      sMaybeMenuItem := GetUserChoiceFromTreeViewMenuLoadedFromPopupMenu(frmMain.pmFavoriteTabs, tvmcFavoriteTabs, p.X, p.Y, iWantedWidth, iWantedHeight);
+      if sMaybeMenuItem <> nil then sMaybeMenuItem.Click;
+    end
     else
     begin
-      iWantedWidth := frmMain.ActiveFrame.Width;
-      iWantedHeight := frmMain.ActiveFrame.Height;
+      frmMain.pmFavoriteTabs.Popup(p.X, p.Y);
     end;
-
-    sMaybeMenuItem := GetUserChoiceFromTreeViewMenuLoadedFromPopupMenu(frmMain.pmFavoriteTabs, tvmcFavoriteTabs, p.X, p.Y, iWantedWidth, iWantedHeight);
-    if sMaybeMenuItem <> nil then sMaybeMenuItem.Click;
   end
   else
   begin
-    frmMain.pmFavoriteTabs.Popup(p.X, p.Y);
+    // If we've seen the 'setup' parameter, let's see if user provided a name or not.
+    if sSearchedFavoriteTabsName<>'' then
+    begin
+      // If we got a name, let's attempt to load a setup with that name.
+      iMaybeIndex := gFavoriteTabsList.GetIndexForSuchFavoriteTabsName(sSearchedFavoriteTabsName);
+      if iMaybeIndex <> -1 then
+        gFavoriteTabsList.LoadTabsFromXmlEntry(iMaybeIndex)
+      else
+        if gToolbarReportErrorWithCommands then
+          msgError(Format(rsFavoriteTabs_SetupNotExist,[sSearchedFavoriteTabsName]));
+    end
+    else
+    begin
+      // If no name provided, it means user want to unselect current setup.
+      gFavoriteTabsList.LastFavoriteTabsLoadedUniqueId := DCGetNewGUID;
+    end;
   end;
 end;
 
@@ -5275,6 +5379,69 @@ begin
       if Editor.CanFocus then Editor.SetFocus;
       TfrmOptionsPluginsBase(Editor).ActualAddPlugin(sPluginFilename);
     end;
+  end;
+end;
+
+procedure TMainCommands.cm_LoadList(const Params: array of string);
+var
+  aFile: TFile;
+  sValue: String;
+  AParam: String;
+  Index: Integer;
+  AFileName: String;
+  FileList: TFileTree;
+  NewPage: TFileViewPage;
+  StringList: TStringListUAC;
+  Notebook: TFileViewNotebook;
+  SearchResultFS: ISearchResultFileSource;
+begin
+  with frmMain do
+  begin
+    AFileName:= EmptyStr;
+    Notebook := ActiveNotebook;
+    for AParam in Params do
+    begin
+      if GetParamValue(AParam, 'filename', sValue) then
+        AFileName := sValue
+      else if GetParamValue(AParam, 'side', sValue) then
+      begin
+        if sValue = 'left' then Notebook := LeftTabs
+        else if sValue = 'right' then Notebook := RightTabs
+        else if sValue = 'active' then Notebook := ActiveNotebook
+        else if sValue = 'inactive' then Notebook := NotActiveNotebook;
+      end;
+    end;
+    if (Length(AFileName) = 0) then
+    begin
+      msgError(rsMsgInvalidFilename);
+      Exit;
+    end;
+    StringList:= TStringListUAC.Create;
+    try
+      StringList.LoadFromFile(AFileName);
+
+      FileList := TFileTree.Create;
+
+      for Index := 0 to StringList.Count - 1 do
+      begin
+        try
+          aFile := TFileSystemFileSource.CreateFileFromFile(StringList[Index]);
+          FileList.AddSubNode(aFile);
+        except
+          on EFileNotFound do ;
+        end;
+      end;
+      SearchResultFS := TSearchResultFileSource.Create;
+      SearchResultFS.AddList(FileList, TFileSystemFileSource.GetFileSource);
+
+      NewPage := Notebook.ActivePage;
+      NewPage.FileView.AddFileSource(SearchResultFS, SearchResultFS.GetRootDir);
+      NewPage.FileView.FlatView := True;
+      NewPage.MakeActive;
+    except
+      on E: Exception do msgError(E.Message);
+    end;
+    StringList.Free;
   end;
 end;
 

@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    This unit contains TFileViewPage and TFileViewNotebook objects.
 
-   Copyright (C) 2016-2021 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2016-2022 Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -49,6 +49,7 @@ type
     FOnActivate: TNotifyEvent;
     FCurrentTitle: String;
     FPermanentTitle: String;
+    FBackupViewMode: String;
     FBackupColumnSet: String;
     FOnChangeFileView: TNotifyEvent;
     FBackupViewClass: TFileViewClass;
@@ -96,6 +97,7 @@ type
     property PermanentTitle: String read FPermanentTitle write SetPermanentTitle;
     property CurrentTitle: String read FCurrentTitle;
     property OnActivate: TNotifyEvent read FOnActivate write FOnActivate;
+    property BackupViewMode: String read FBackupViewMode write FBackupViewMode;
     property BackupColumnSet: String read FBackupColumnSet write FBackupColumnSet;
     property BackupViewClass: TFileViewClass read FBackupViewClass write FBackupViewClass;
     property OnChangeFileView: TNotifyEvent read FOnChangeFileView write FOnChangeFileView;
@@ -109,6 +111,7 @@ type
     FNotebookSide: TFilePanelSelect;
     FStartDrag: Boolean;
     FDraggedPageIndex: Integer;
+    FTabDblClicked: Boolean;
     FHintPageIndex: Integer;
     FLastMouseDownTime: TDateTime;
     FLastMouseDownPageIndex: Integer;
@@ -314,7 +317,7 @@ begin
       NewCaption := '*' + NewCaption;
 
     if (tb_text_length_limit in gDirTabOptions) and (UTF8Length(NewCaption) > gDirTabLimit) then
-      NewCaption := UTF8Copy(NewCaption, 1, gDirTabLimit) + '...';
+      NewCaption := UTF8Copy(NewCaption, 1, gDirTabLimit) + '..';
 
 {$IF DEFINED(LCLGTK2)}
     Caption := NewCaption;
@@ -350,6 +353,7 @@ begin
   if Assigned(aFileView) then
   begin
     aFileView.Parent := Self;
+    BackupViewMode := EmptyStr;
     if Assigned(FOnChangeFileView) then
       FOnChangeFileView(aFileView);
   end;
@@ -540,15 +544,9 @@ begin
 end;
 
 procedure TFileViewNotebook.DestroyAllPages;
-var
-   tPage:TFileViewPage;
 begin
   FCanChangePageIndex:= False;
-  while PageCount > 0 do
-  begin
-    tPage:=Page[0];
-    if tPage<>nil then FreeAndNil(tPage);
-  end;
+  Tabs.Clear;
   FCanChangePageIndex:= True;
 end;
 
@@ -617,10 +615,18 @@ begin
           ArrowWidth:= arrow_spacing + scroll_arrow_hlength;
           if (X > ArrowWidth) and (X < ClientWidth - ArrowWidth) then
           {$ENDIF}
+
+          {$IFNDEF LCLCOCOA}
           OnDblClick(Self);
           FStartDrag:= False;
           FLastMouseDownTime:= 0;
           FLastMouseDownPageIndex:= -1;
+          {$ELSE}
+          FStartDrag:= False;
+          FLastMouseDownTime:= 0;
+          FTabDblClicked := true;
+          {$ENDIF}
+
         end;
     end;
 end;
@@ -654,6 +660,15 @@ end;
 
 procedure TFileViewNotebook.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+{$IFDEF LCLCOCOA}
+  if FTabDblClicked then
+  begin
+    OnDblClick(Self);
+    FLastMouseDownPageIndex:= -1;
+    FTabDblClicked := false;
+  end;
+{$ENDIF}
+
   inherited;
 
   FStartDrag := False;
@@ -725,7 +740,12 @@ begin
     begin
       // Move within the same panel.
       if ATabIndex <> -1 then
+      begin
         Tabs.Move(FDraggedPageIndex, ATabIndex);
+        {$IFDEF LCLCOCOA}
+        GetPage(ATabIndex).MakeActive;
+        {$ENDIF}
+      end;
     end
     else if (SourceNotebook.FDraggedPageIndex < SourceNotebook.PageCount) then
     begin

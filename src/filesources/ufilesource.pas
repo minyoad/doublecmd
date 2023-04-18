@@ -5,7 +5,7 @@ unit uFileSource;
 interface
 
 uses
-  Classes, SysUtils, DCStrUtils, syncobjs, LCLProc, URIParser,
+  Classes, SysUtils, DCStrUtils, syncobjs, LCLProc, URIParser, Menus,
   uFileSourceOperation,
   uFileSourceOperationTypes,
   uFileSourceProperty,
@@ -17,6 +17,16 @@ type
   TFileSource = class;
   TFileSourceConnection = class;
   IFileSource = interface;
+
+  TFileSourceField = record
+    Content: String;
+    Header: String;
+    Width: Integer;
+    Option: String;
+    Align: TAlignment;
+  end;
+
+  TFileSourceFields = array of TFileSourceField;
 
   TPathsArray = array of string;
   TFileSourceOperationsClasses = array[TFileSourceOperationType] of TFileSourceOperationClass;
@@ -36,6 +46,7 @@ type
     function GetClassName: String;
     function GetRefCount: Integer;
 
+    function GetFileSystem: String;
     function GetCurrentAddress: String;
     function GetCurrentWorkingDirectory: String;
     function SetCurrentWorkingDirectory(NewDir: String): Boolean;
@@ -90,6 +101,8 @@ type
     function GetLocalName(var aFile: TFile): Boolean;
     function CreateDirectory(const Path: String): Boolean;
     function FileSystemEntryExists(const Path: String): Boolean;
+    function GetDefaultView(out DefaultView: TFileSourceFields): Boolean;
+    function QueryContextMenu(AFiles: TFiles; var AMenu: TPopupMenu): Boolean;
 
     function GetConnection(Operation: TFileSourceOperation): TFileSourceConnection;
     procedure RemoveOperationFromQueue(Operation: TFileSourceOperation);
@@ -102,6 +115,7 @@ type
 
     property URI: TURI read GetURI;
     property ClassName: String read GetClassName;
+    property FileSystem: String read GetFileSystem;
     property CurrentAddress: String read GetCurrentAddress;
     property ParentFileSource: IFileSource read GetParentFileSource write SetParentFileSource;
     property Properties: TFileSourceProperties read GetProperties;
@@ -193,8 +207,8 @@ type
     function CreateFileObject(const APath: String): TFile;
 
   public
-    constructor Create; virtual;
-    constructor Create(const URI: TURI); virtual;
+    constructor Create; virtual; overload;
+    constructor Create(const URI: TURI); virtual; overload;
     destructor Destroy; override;
 
     function Equals(aFileSource: IFileSource): Boolean; overload;
@@ -250,6 +264,7 @@ type
                                             var theNewProperties: TFileProperties): TFileSourceOperation; virtual;
     function GetOperationClass(OperationType: TFileSourceOperationType): TFileSourceOperationClass;
 
+    class function GetMainIcon(out Path: String): Boolean; virtual;
     {en
        Returns @true if the given path is supported by the file source,
        @false otherwise.
@@ -265,10 +280,13 @@ type
     function GetRootDir(sPath : String): String; virtual; overload;
     function GetRootDir: String; virtual; overload;
     function GetPathType(sPath : String): TPathType; virtual;
+    function GetFileSystem: String; virtual;
 
     function CreateDirectory(const Path: String): Boolean; virtual;
     function FileSystemEntryExists(const Path: String): Boolean; virtual;
     function GetFreeSpace(Path: String; out FreeSize, TotalSize : Int64) : Boolean; virtual;
+    function QueryContextMenu(AFiles: TFiles; var AMenu: TPopupMenu): Boolean; virtual;
+    function GetDefaultView(out DefaultView: TFileSourceFields): Boolean; virtual;
     function GetLocalName(var aFile: TFile): Boolean; virtual;
 
     function GetConnection(Operation: TFileSourceOperation): TFileSourceConnection; virtual;
@@ -563,6 +581,11 @@ begin
   end;
 end;
 
+function TFileSource.GetFileSystem: String;
+begin
+  Result:= EmptyStr;
+end;
+
 function TFileSource.CreateDirectory(const Path: String): Boolean;
 begin
   Result := False;
@@ -576,6 +599,16 @@ end;
 function TFileSource.GetFreeSpace(Path: String; out FreeSize, TotalSize : Int64) : Boolean;
 begin
   Result := False; // not supported by default
+end;
+
+function TFileSource.QueryContextMenu(AFiles: TFiles; var AMenu: TPopupMenu): Boolean;
+begin
+  Result:= False;
+end;
+
+function TFileSource.GetDefaultView(out DefaultView: TFileSourceFields): Boolean;
+begin
+  Result:= False;
 end;
 
 function TFileSource.GetLocalName(var aFile: TFile): Boolean;
@@ -716,6 +749,11 @@ end;
 function TFileSource.GetOperationClass(OperationType: TFileSourceOperationType): TFileSourceOperationClass;
 begin
   Result := FOperationsClasses[OperationType];
+end;
+
+class function TFileSource.GetMainIcon(out Path: String): Boolean;
+begin
+  Result := False;
 end;
 
 class function TFileSource.IsSupportedPath(const Path: String): Boolean;

@@ -43,12 +43,14 @@ resourcestring
   rsMsgFileExistsRwrt = 'File %s exists, overwrite?';
   rsMsgFileChangedSave = 'File %s changed, save?';
   rsMsgReplaceThisText = 'Do you want to replace this text?';
+  rsMsgCancelOperation = 'Are you sure that you want to cancel this operation?';
   rsMsgFileReloadWarning = 'Are you sure you want to reload the current file and lose the changes?';
   rsMsgFolderExistsRwrt = 'Folder %s exists, merge?';
   rsMsgFileReadOnly = 'File %s is marked as read-only/hidden/system. Delete it?';
   rsMsgNewFile = 'New file';
   rsMsgDelFlDr = 'Delete %d selected files/directories?';
   rsMsgDelSel = 'Delete selected "%s"?';
+  rsMsgTestArchive = 'Do you want to test selected archives?';
   rsMsgVerifyChecksum = 'Do you want to verify selected checksums?';
   rsMsgObjectNotExists = 'Object does not exist!';
   // 12.05.2009 - another message, when deleting to trash
@@ -161,6 +163,7 @@ resourcestring
   rsFontUsageFunctionButtons = 'Function Buttons Font';
   rsFontUsageSearchResults = 'Search Results Font';
   rsFontUsageTreeViewMenu = 'Tree View Menu Font';
+  rsFontUsageStatusBar = 'Status Bar Font';
 
   // Tooltip section
   rsOptTooltipConfigureSaveToChange = 'To change file type tooltip configuration, either APPLY or DELETE current editing one';
@@ -242,6 +245,7 @@ resourcestring
   rsMsgFilePathOverMaxPath = 'The target name length (%d) is more than %d characters!' + #13 + '%s' + #13 + 'Most programs will not be able to access a file/directory with such a long name!';
   rsExtsClosedBracketNoFound = '"]" not found in line %s';
   rsExtsCommandWithNoExt = 'No extension defined before command "%s". It will be ignored.';
+  rsMsgTerminalDisabled = 'Built-in terminal window disabled. Do you want to enable it?';
 
   //Hot Dir related
   rsMsgHotDirWhatToDelete = 'Do you want to delete all elements inside the sub-menu [%s]?'+#$0A+'Answering NO will delete only menu delimiters but will keep element inside sub-menu.';
@@ -365,13 +369,13 @@ resourcestring
   rsMnuEject = 'Eject';
   rsMnuSortBy = 'Sort by';
   rsMnuNew = 'New';
+  rsMnuRestore = 'Restore';
   rsMnuPackHere = 'Pack here...';
   rsMnuExtractHere = 'Extract here...';
   // for main menu
   rsMnuCreateShortcut = 'Create Shortcut...';
   rsMnuMapNetworkDrive = 'Map Network Drive...';
   rsMnuDisconnectNetworkDrive = 'Disconnect Network Drive...';
-  rsMnuCopyNetNamesToClip = 'Copy names with UNC path';
   // for content plugins menu
   rsMnuContentDefault = '<Default>';
   rsMnuContentOctal = 'Octal';
@@ -397,6 +401,7 @@ resourcestring
   rsMsgErrInvalidLink = 'Invalid link';
   // Vfs
   rsVfsNetwork = 'Network';
+  rsVfsRecycleBin = 'Recycle Bin';
 
   // Buttons.
   rsDlgButtonOK = '&OK';
@@ -415,7 +420,7 @@ resourcestring
   rsDlgButtonOverwriteSmaller = 'Overwrite All S&maller';
   rsDlgButtonOverwriteLarger = 'Overwrite All &Larger';
   rsDlgButtonAutoRenameSource = 'A&uto-rename source files';
-  rsDlgButtonAutoRenameTarget = 'A&uto-rename target files';
+  rsDlgButtonAutoRenameTarget = 'Auto-rename tar&get files';
   rsDlgButtonSkip = '&Skip';
   rsDlgButtonSkipAll = 'S&kip All';
   rsDlgButtonIgnore = 'Ig&nore';
@@ -524,6 +529,7 @@ resourcestring
   rsFuncType = 'Type';
   rsFuncComment = 'Comment';
   rsFuncCompressedSize = 'Compressed size';
+  rsFuncTrashOrigPath = 'Original path';
 
   // Tools
   rsToolViewer = 'Viewer';
@@ -572,7 +578,12 @@ resourcestring
   rsDiffModifies = ' Modifies: ';
   rsDiffAdds = ' Adds: ';
   rsDiffDeletes = ' Deletes: ';
+  rsDiffComparing = 'Comparing...';
   rsDiffFilesIdentical = 'The two files are identical!';
+  rsDiffTextIdentical = 'The text is identical, but the following options are used:';
+  rsDiffTextIdenticalNotMatch =  'The text is identical, but the files do not match!'+#$0A+'The following differences were found:';
+  rsDiffTextDifferenceEncoding = 'Encoding';
+  rsDiffTextDifferenceLineEnding = 'Line-endings';
   // Find files dialog
   rsFindSearchFiles = 'Find files';
   rsFindDefineTemplate = 'Define template';

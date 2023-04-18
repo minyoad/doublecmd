@@ -45,7 +45,7 @@ uses
   {$IFDEF LCLQT5}
   , qt5, qtwidgets
   {$ENDIF}
-  {$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
+  {$IF DEFINED(MSWINDOWS) and (DEFINED(LCLQT5) or DEFINED(DARKWIN))}
   , uDarkStyle
   {$ENDIF}
   ;
@@ -81,12 +81,15 @@ type
     FPluginWindow: HWND;
     function GetCanPreview: Boolean;
     function GetCanPrint: Boolean;
+    function GetDetectStr: String;
     function GIsLoaded: Boolean;
+    procedure SetDetectStr(const AValue: String);
+    procedure WlxPrepareContainer(var {%H-}ParentWin: HWND);
   public
     Name: String;
     FileName: String;
-    DetectStr: String;
     pShowFlags: Integer;
+    QuickView: Boolean;
     Enabled: Boolean;
     //---------------------
     constructor Create;
@@ -113,6 +116,7 @@ type
     procedure ResizeWindow(aRect: TRect);
     //---------------------
     property IsLoaded: Boolean read GIsLoaded;
+    property DetectStr: String read GetDetectStr write SetDetectStr;
     property ModuleHandle: TLibHandle read FModuleHandle write FModuleHandle;
     property CanPreview: Boolean read GetCanPreview;
     property PluginWindow: HWND read FPluginWindow;
@@ -210,11 +214,17 @@ begin
 end;
 {$ENDIF}
 
-procedure WlxPrepareContainer(var {%H-}ParentWin: HWND);
+{ TWlxModule }
+
+procedure TWlxModule.WlxPrepareContainer(var {%H-}ParentWin: HWND);
 begin
 {$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
   ParentWin := HWND(QWidget_winId(TQtWidget(ParentWin).GetContainerWidget));
-  ParentWin := Windows.GetAncestor(ParentWin, GA_ROOT);
+  if QuickView then
+    ParentWin := Windows.GetAncestor(ParentWin, GA_PARENT)
+  else begin
+    ParentWin := Windows.GetAncestor(ParentWin, GA_ROOT);
+  end;
 {$ELSEIF DEFINED(LCLGTK) or DEFINED(LCLGTK2)}
   ParentWin := HWND(GetFixedWidget(Pointer(ParentWin)));
 {$ELSEIF DEFINED(LCLQT) or DEFINED(LCLQT5)}
@@ -222,16 +232,24 @@ begin
 {$ENDIF}
 end;
 
-{ TWlxModule }
-
 function TWlxModule.GIsLoaded: Boolean;
 begin
   Result := FModuleHandle <> 0;
 end;
 
+procedure TWlxModule.SetDetectStr(const AValue: String);
+begin
+  FParser.DetectStr:= AValue;
+end;
+
 function TWlxModule.GetCanPrint: Boolean;
 begin
   Result := Assigned(ListPrint) or Assigned(ListPrintW);
+end;
+
+function TWlxModule.GetDetectStr: String;
+begin
+  Result:= FParser.DetectStr;
 end;
 
 function TWlxModule.GetCanPreview: Boolean;
@@ -321,13 +339,17 @@ function TWlxModule.CallListLoad(ParentWin: HWND; FileToLoad: String; ShowFlags:
 begin
   WlxPrepareContainer(ParentWin);
 
-{$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
+{$IF DEFINED(MSWINDOWS) and (DEFINED(LCLQT5) or DEFINED(DARKWIN))}
   if g_darkModeEnabled then
-    ShowFlags:= ShowFlags or lcp_darkmode or lcp_darkmodenative;
+  begin
+    ShowFlags:= ShowFlags or lcp_darkmode;
+    if g_darkModeSupported then
+      ShowFlags:= ShowFlags or lcp_darkmodenative;
+  end;
 {$ENDIF}
 
   if Assigned(ListLoadW) then
-    FPluginWindow := ListLoadW(ParentWin, PWideChar(UTF8Decode(FileToLoad)), ShowFlags)
+    FPluginWindow := ListLoadW(ParentWin, PWideChar(CeUtf8ToUtf16(FileToLoad)), ShowFlags)
   else if Assigned(ListLoad) then
     FPluginWindow := ListLoad(ParentWin, PAnsiChar(CeUtf8ToSys(FileToLoad)), ShowFlags)
   else
@@ -364,7 +386,7 @@ begin
 {$ENDIF}
 
   if Assigned(ListLoadNextW) then
-    Result := ListLoadNextW(ParentWin, FPluginWindow, PWideChar(UTF8Decode(FileToLoad)), ShowFlags)
+    Result := ListLoadNextW(ParentWin, FPluginWindow, PWideChar(CeUtf8ToUtf16(FileToLoad)), ShowFlags)
   else if Assigned(ListLoadNext) then
     Result := ListLoadNext(ParentWin, FPluginWindow, PAnsiChar(CeUtf8ToSys(FileToLoad)), ShowFlags)
   else
@@ -410,7 +432,7 @@ end;
 function TWlxModule.CallListSearchText(SearchString: String; SearchParameter: Integer): Integer;
 begin
   if Assigned(ListSearchTextW) then
-    Result := ListSearchTextW(FPluginWindow, PWideChar(UTF8Decode(SearchString)), SearchParameter)
+    Result := ListSearchTextW(FPluginWindow, PWideChar(CeUtf8ToUtf16(SearchString)), SearchParameter)
   else if Assigned(ListSearchText) then
     Result := ListSearchText(FPluginWindow, PAnsiChar(CeUtf8ToSys(SearchString)), SearchParameter)
   else
@@ -441,7 +463,6 @@ function TWlxModule.FileParamVSDetectStr(AFileName: String; bForce: Boolean): Bo
 begin
   if not Enabled then Exit(False);
   FParser.IsForce:= bForce;
-  FParser.DetectStr := Self.DetectStr;
   DCDebug('DetectStr = ' + FParser.DetectStr);
   DCDebug('AFileName = ' + AFileName);
   Result := FParser.TestFileResult(AFileName);
@@ -464,7 +485,9 @@ begin
   with aRect do
   begin
     {$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
-    OffsetRect(aRect, 0, GetSystemMetrics(SM_CYMENU));
+    if not QuickView then begin
+      OffsetRect(aRect, 0, GetSystemMetrics(SM_CYMENU));
+    end;
     MoveWindow(FPluginWindow, Left, Top, Right - Left, Bottom - Top, True);
     {$ELSEIF DEFINED(LCLWIN32)}
     MoveWindow(FPluginWindow, Left, Top, Right - Left, Bottom - Top, True);
@@ -482,8 +505,8 @@ function TWlxModule.CallListPrint(FileToPrint, DefPrinter: String;
   PrintFlags: Integer; var Margins: trect): Integer;
 begin
   if Assigned(ListPrintW) then
-    Result := ListPrintW(FPluginWindow, PWideChar(UTF8Decode(FileToPrint)),
-      PWideChar(UTF8Decode(DefPrinter)), PrintFlags, Margins)
+    Result := ListPrintW(FPluginWindow, PWideChar(CeUtf8ToUtf16(FileToPrint)),
+      PWideChar(CeUtf8ToUtf16(DefPrinter)), PrintFlags, Margins)
   else if Assigned(ListPrint) then
     Result := ListPrint(FPluginWindow, PAnsiChar(CeUtf8ToSys(FileToPrint)), PAnsiChar(CeUtf8ToSys(DefPrinter)),
       PrintFlags, Margins)
@@ -516,7 +539,7 @@ end;
 function TWlxModule.CallListGetPreviewBitmap(FileToLoad: String; Width, Height: Integer; ContentBuf: String): HBITMAP;
 begin
   if Assigned(ListGetPreviewBitmapW) then
-    Result := ListGetPreviewBitmapW(PWideChar(UTF8Decode(FileToLoad)), Width, Height, PByte(ContentBuf), Length(ContentBuf))
+    Result := ListGetPreviewBitmapW(PWideChar(CeUtf8ToUtf16(FileToLoad)), Width, Height, PByte(ContentBuf), Length(ContentBuf))
   else if Assigned(ListGetPreviewBitmap) then
     Result := ListGetPreviewBitmap(PAnsiChar(CeUtf8ToSys(FileToLoad)), Width, Height, PByte(ContentBuf), Length(ContentBuf))
   else

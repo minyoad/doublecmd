@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    Wfx plugin for working with File Transfer Protocol
 
-   Copyright (C) 2013-2019 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2013-2021 Alexander Koblov (alexx2000@mail.ru)
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -55,6 +55,7 @@ type
     SourceName, TargetName: PWideChar;
     procedure DoProgress(Percent: Int64);
   protected
+    procedure PrintLastError;
     procedure DetectEncoding;
     function AuthKey: Boolean;
     function Connect: Boolean; override;
@@ -63,6 +64,7 @@ type
     function Login: Boolean; override;
     function Logout: Boolean; override;
     function GetCurrentDir: String; override;
+    function NetworkError: Boolean; override;
     procedure CloneTo(AValue: TFTPSendEx); override;
     function FileSize(const FileName: String): Int64; override;
     function FileExists(const FileName: String): Boolean; override;
@@ -159,7 +161,11 @@ begin
     if not Assigned(FChannel) then
     begin
       FLastError:= libssh2_session_last_errno(FSession);
-      if (FLastError <> LIBSSH2_ERROR_EAGAIN) then Exit(False);
+      if (FLastError <> LIBSSH2_ERROR_EAGAIN) then
+      begin
+        PrintLastError;
+        Exit(False);
+      end;
     end;
   until not ((FChannel = nil) and (FLastError = LIBSSH2_ERROR_EAGAIN));
   Result:= Assigned(FChannel);
@@ -220,6 +226,17 @@ procedure TScpSend.DoProgress(Percent: Int64);
 begin
   if ProgressProc(PluginNumber, SourceName, TargetName, Percent) = 1 then
     raise EUserAbort.Create(EmptyStr);
+end;
+
+procedure TScpSend.PrintLastError;
+var
+  Message: String;
+  errmsg_len: cint;
+  errmsg: PAnsiChar;
+begin
+  FLastError:= libssh2_session_last_error(FSession, @errmsg, @errmsg_len, 0);
+  SetString(Message, errmsg, errmsg_len);
+  LogProc(PluginNumber, msgtype_importanterror, PWideChar(UnicodeString('SSH ERROR ' + Message)));
 end;
 
 procedure TScpSend.DetectEncoding;
@@ -317,9 +334,10 @@ begin
       //* Since we have not set non-blocking, tell libssh2 we are blocking */
       libssh2_session_set_blocking(FSession, 1);
 
-      if libssh2_session_handshake(FSession, FSock.Socket) <> 0 then
+      FLastError:= libssh2_session_handshake(FSession, FSock.Socket);
+      if FLastError <> 0 then
       begin
-        DoStatus(False, 'Cannot establishing SSH session');
+        DoStatus(False, 'Cannot perform the SSH handshake ' + IntToStr(FLastError));
         Exit(False);
       end;
       LogProc(PluginNumber, MSGTYPE_CONNECT, nil);
@@ -464,6 +482,11 @@ begin
   Result:= FCurrentDir;
 end;
 
+function TScpSend.NetworkError: Boolean;
+begin
+  Result:= FSock.CanRead(0) and (libssh2_session_last_errno(FSession) <> 0);
+end;
+
 procedure TScpSend.CloneTo(AValue: TFTPSendEx);
 begin
   inherited CloneTo(AValue);
@@ -559,7 +582,7 @@ begin
   SendStream := TFileStreamEx.Create(FDirectFileName, fmOpenRead or fmShareDenyWrite);
 
   TargetName:= PWideChar(ServerToClient(FileName));
-  SourceName:= PWideChar(UTF8Decode(FDirectFileName));
+  SourceName:= PWideChar(CeUtf8ToUtf16(FDirectFileName));
 
   FileSize:= SendStream.Size;
   FBuffer:= GetMem(SMB_BUFFER_SIZE);
@@ -636,7 +659,7 @@ begin
   RetrStream := TFileStreamEx.Create(FDirectFileName, fmCreate or fmShareDenyWrite);
 
   SourceName := PWideChar(ServerToClient(FileName));
-  TargetName := PWideChar(UTF8Decode(FDirectFileName));
+  TargetName := PWideChar(CeUtf8ToUtf16(FDirectFileName));
 
   libssh2_session_set_blocking(FSession, 0);
   try

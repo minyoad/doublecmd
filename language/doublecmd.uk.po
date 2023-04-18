@@ -10,7 +10,11 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Native-Language: Український нова\n"
+"X-Native-Language: Українська мова\n"
+
+#: foptionscolors.rsdarkmodeoptions
+msgid "Auto;Enabled;Disabled"
+msgstr ""
 
 #: fsyncdirsdlg.rscomparingpercent
 msgid "Comparing... %d%% (ESC to cancel)"
@@ -86,6 +90,10 @@ msgstr "Перейти за поси&ланнями"
 #: tfilesystemcopymoveoperationoptionsui.cbreservespace.caption
 msgid "&Reserve space"
 msgstr "Зарезервувати &місце"
+
+#: tfilesystemcopymoveoperationoptionsui.chkcopyonwrite.caption
+msgid "Copy on write"
+msgstr ""
 
 #: tfilesystemcopymoveoperationoptionsui.chkverify.caption
 msgid "&Verify"
@@ -530,6 +538,12 @@ msgctxt "TFRMDIFFER.ACTEDITREDO.CAPTION"
 msgid "Redo"
 msgstr "Повторити"
 
+#: tfrmdiffer.acteditredo.hint
+#, fuzzy
+msgctxt "tfrmdiffer.acteditredo.hint"
+msgid "Redo"
+msgstr "Повторити"
+
 #: tfrmdiffer.acteditselectall.caption
 msgid "Select &All"
 msgstr "Виділити в&се"
@@ -539,10 +553,64 @@ msgctxt "TFRMDIFFER.ACTEDITUNDO.CAPTION"
 msgid "Undo"
 msgstr "Вернути"
 
+#: tfrmdiffer.acteditundo.hint
+#, fuzzy
+msgctxt "tfrmdiffer.acteditundo.hint"
+msgid "Undo"
+msgstr "Вернути"
+
 #: tfrmdiffer.actexit.caption
 msgctxt "tfrmdiffer.actexit.caption"
 msgid "E&xit"
 msgstr "Ви&хід"
+
+#: tfrmdiffer.actfind.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actfind.caption"
+msgid "&Find"
+msgstr "З&найти"
+
+#: tfrmdiffer.actfind.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actfind.hint"
+msgid "Find"
+msgstr "Знайти"
+
+#: tfrmdiffer.actfindnext.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actfindnext.caption"
+msgid "Find next"
+msgstr "Знайти наступний"
+
+#: tfrmdiffer.actfindnext.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actfindnext.hint"
+msgid "Find next"
+msgstr "Знайти наступний"
+
+#: tfrmdiffer.actfindprev.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actfindprev.caption"
+msgid "Find previous"
+msgstr "Знайти попереднє"
+
+#: tfrmdiffer.actfindprev.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actfindprev.hint"
+msgid "Find previous"
+msgstr "Знайти попереднє"
+
+#: tfrmdiffer.actfindreplace.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actfindreplace.caption"
+msgid "&Replace"
+msgstr "&Замінити"
+
+#: tfrmdiffer.actfindreplace.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actfindreplace.hint"
+msgid "Replace"
+msgstr "Замінити"
 
 #: tfrmdiffer.actfirstdifference.caption
 msgctxt "tfrmdiffer.actfirstdifference.caption"
@@ -553,6 +621,18 @@ msgstr "Перша відмінність"
 msgctxt "tfrmdiffer.actfirstdifference.hint"
 msgid "First Difference"
 msgstr "Перша відмінність"
+
+#: tfrmdiffer.actgotoline.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actgotoline.caption"
+msgid "Goto Line..."
+msgstr "Перехід до рядка"
+
+#: tfrmdiffer.actgotoline.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actgotoline.hint"
+msgid "Goto Line"
+msgstr "Перехід до рядка"
 
 #: tfrmdiffer.actignorecase.caption
 msgid "Ignore Case"
@@ -904,6 +984,7 @@ msgid "Redo"
 msgstr "Повторити"
 
 #: tfrmeditor.acteditrplc.caption
+msgctxt "tfrmeditor.acteditrplc.caption"
 msgid "&Replace"
 msgstr "&Замінити"
 
@@ -1052,6 +1133,10 @@ msgstr "&Скасувати"
 msgctxt "tfrmeditsearchreplace.buttonpanel.okbutton.caption"
 msgid "&OK"
 msgstr "&Гаразд"
+
+#: tfrmeditsearchreplace.cbmultiline.caption
+msgid "&Multiline pattern"
+msgstr ""
 
 #: tfrmeditsearchreplace.cbsearchcasesensitive.caption
 msgctxt "TFRMEDITSEARCHREPLACE.CBSEARCHCASESENSITIVE.CAPTION"
@@ -1586,6 +1671,10 @@ msgstr "Шукати файли, що &НЕ містять текст"
 #: tfrmfinddlg.cbnotolderthan.caption
 msgid "N&ot older than:"
 msgstr "Н&е старші ніж:"
+
+#: tfrmfinddlg.cbofficexml.caption
+msgid "Offi&ce XML"
+msgstr ""
 
 #: tfrmfinddlg.cbopenedtabs.caption
 msgid "Opened tabs"
@@ -2169,6 +2258,10 @@ msgstr "Копіювати ім'я файла(ів) разом з повним �
 msgid "Copy &Filename(s) to Clipboard"
 msgstr "Копіювати ім'я файла(ів) в &буфер"
 
+#: tfrmmain.actcopynetnamestoclip.caption
+msgid "Copy names with UNC path"
+msgstr "Копіювати в буфер імена з UNC-шляхом"
+
 #: tfrmmain.actcopynoask.caption
 msgid "Copy files without asking for confirmation"
 msgstr "Копіювати файли без запиту підтвердження"
@@ -2220,6 +2313,10 @@ msgid "Directory &Hotlist"
 msgstr "Особистий спис&ок каталогів"
 
 #: tfrmmain.actdoanycmcommand.caption
+msgid "Execute &internal command..."
+msgstr ""
+
+#: tfrmmain.actdoanycmcommand.hint
 msgid "Select any command and execute it"
 msgstr "Вибрати будь-яку команду і виконати її"
 
@@ -2395,6 +2492,14 @@ msgstr "Перегляд ескізів в лівій панелі"
 msgid "Load tabs from Favorite Tabs"
 msgstr "Завантажити вкладки з обраних вкладок"
 
+#: tfrmmain.actloadlist.caption
+msgid "Load List"
+msgstr ""
+
+#: tfrmmain.actloadlist.hint
+msgid "Load list of files/folders from the specified text file"
+msgstr ""
+
 #: tfrmmain.actloadselectionfromclip.caption
 msgid "Load Selection from Clip&board"
 msgstr "Завантажити виділенння з б&уферу"
@@ -2450,6 +2555,14 @@ msgstr "Зняти виділення з у&сіх"
 #: tfrmmain.actminimize.caption
 msgid "Minimize window"
 msgstr "Згорнути"
+
+#: tfrmmain.actmovetableft.caption
+msgid "Move current tab to the left"
+msgstr ""
+
+#: tfrmmain.actmovetabright.caption
+msgid "Move current tab to the right"
+msgstr ""
 
 #: tfrmmain.actmultirename.caption
 msgid "Multi-&Rename Tool"
@@ -2753,6 +2866,14 @@ msgstr "Включити/виключити чорний список файлі
 msgctxt "TFRMMAIN.ACTSYMLINK.CAPTION"
 msgid "Create Symbolic &Link..."
 msgstr "Створити &символічне посилання..."
+
+#: tfrmmain.actsyncchangedir.caption
+msgid "Synchronous navigation"
+msgstr ""
+
+#: tfrmmain.actsyncchangedir.hint
+msgid "Synchronous directory changing in both panels"
+msgstr ""
 
 #: tfrmmain.actsyncdirs.caption
 msgid "Syn&chronize dirs..."
@@ -3232,6 +3353,7 @@ msgid "&OK"
 msgstr "&Гаразд"
 
 #: tfrmmaskinputdlg.chkcasesensitive.caption
+msgctxt "tfrmmaskinputdlg.chkcasesensitive.caption"
 msgid "Case sensitive"
 msgstr "Чутливість до регістру"
 
@@ -3251,19 +3373,13 @@ msgstr "Вкажіть маску (роздільник - ';'):"
 msgid "O&r select predefined selection type:"
 msgstr "Або вибе&ріть тип виділення за шаблоном:"
 
-#: tfrmmkdir.btncancel.caption
-msgctxt "TFRMMKDIR.BTNCANCEL.CAPTION"
-msgid "&Cancel"
-msgstr "&Скасувати"
-
-#: tfrmmkdir.btnok.caption
-msgctxt "TFRMMKDIR.BTNOK.CAPTION"
-msgid "&OK"
-msgstr "&Гаразд"
-
 #: tfrmmkdir.caption
 msgid "Create new directory"
 msgstr "Створити новий каталог"
+
+#: tfrmmkdir.cbextended.caption
+msgid "&Extended syntax"
+msgstr ""
 
 #: tfrmmkdir.lblmakedir.caption
 msgid "&Input new directory name:"
@@ -3577,6 +3693,16 @@ msgctxt "tfrmmultirename.caption"
 msgid "Multi-Rename Tool"
 msgstr "Групове перейменування"
 
+#: tfrmmultirename.cbcasesens.caption
+msgid "A≠a"
+msgstr ""
+
+#: tfrmmultirename.cbcasesens.hint
+#, fuzzy
+msgctxt "tfrmmultirename.cbcasesens.hint"
+msgid "Case sensitive"
+msgstr "Чутливість до регістру"
+
 #: tfrmmultirename.cblog.caption
 #, fuzzy
 #| msgid "Ena&ble"
@@ -3586,6 +3712,14 @@ msgstr "Ввімкн&ено"
 
 #: tfrmmultirename.cblogappend.caption
 msgid "Append"
+msgstr ""
+
+#: tfrmmultirename.cbonlyfirst.caption
+msgid "1x"
+msgstr ""
+
+#: tfrmmultirename.cbonlyfirst.hint
+msgid "Replace only once per file"
 msgstr ""
 
 #: tfrmmultirename.cbregexp.caption
@@ -4091,6 +4225,10 @@ msgstr "Стала кількість колонок"
 #: tfrmoptionsbriefview.rbusefixedwidth.caption
 msgid "Fixed columns width"
 msgstr "Стала ширниа колонок"
+
+#: tfrmoptionscolors.rgdarkmode.caption
+msgid "Dark mode"
+msgstr ""
 
 #: tfrmoptionscolumnsview.cbcuttexttocolwidth.caption
 msgctxt "TFRMOPTIONSCOLUMNSVIEW.CBCUTTEXTTOCOLWIDTH.CAPTION"
@@ -5915,6 +6053,10 @@ msgctxt "TFRMOPTIONSFILEOPERATIONS.CBSKIPFILEOPERROR.CAPTION"
 msgid "S&kip file operations errors and write them to log window"
 msgstr "Пропус&кати помилки при файлових операціях і заносити їх у звіт"
 
+#: tfrmoptionsfileoperations.cbtestarchiveconfirmation.caption
+msgid "Test archive operation"
+msgstr ""
+
 #: tfrmoptionsfileoperations.cbverifychecksumconfirmation.caption
 msgid "Verify checksum operation"
 msgstr "Перевірка контрольних сум"
@@ -6175,13 +6317,17 @@ msgstr "Формат &дати і часу:"
 msgid "File si&ze format:"
 msgstr "&Формат розміру файла:"
 
+#: tfrmoptionsfilesviews.lblfootersizeformat.caption
+msgid "&Footer format:"
+msgstr ""
+
 #: tfrmoptionsfilesviews.lblgigabyte.caption
 msgid "&Gigabyte:"
 msgstr "&Гігабайт:"
 
-#: tfrmoptionsfilesviews.lblheaderfootersizeformat.caption
-msgid "&Header/footer format:"
-msgstr "Загальни&й/рядок стану:"
+#: tfrmoptionsfilesviews.lblheadersizeformat.caption
+msgid "&Header format:"
+msgstr ""
 
 #: tfrmoptionsfilesviews.lblkilobyte.caption
 msgid "&Kilobyte:"
@@ -6835,6 +6981,14 @@ msgstr "Створювати нові з кодуванням:"
 msgid "Always &go to the root of a drive when changing drives"
 msgstr "Завжди переходити в &корінь диску при зміні дисків"
 
+#: tfrmoptionsmisc.chkshowcurdirtitlebar.caption
+msgid "Show &current directory in the main window title bar"
+msgstr ""
+
+#: tfrmoptionsmisc.chkshowsplashform.caption
+msgid "Show &splash screen"
+msgstr ""
+
 #: tfrmoptionsmisc.chkshowwarningmessages.caption
 msgctxt "tfrmoptionsmisc.chkshowwarningmessages.caption"
 msgid "Show &warning messages (\"OK\" button only)"
@@ -7385,11 +7539,6 @@ msgstr "Шаблон {command} позначає команду, запуск я�
 
 #: tfrmoptionsterminal.edrunintermstayopenparams.hint
 msgctxt "tfrmoptionsterminal.edrunintermstayopenparams.hint"
-msgid "{command} should normally be present here to reflect the command to be run in terminal"
-msgstr "Шаблон {command} позначає команду, запуск якої буде проведений в терміналі"
-
-#: tfrmoptionsterminal.edruntermparams.hint
-msgctxt "tfrmoptionsterminal.edruntermparams.hint"
 msgid "{command} should normally be present here to reflect the command to be run in terminal"
 msgstr "Шаблон {command} позначає команду, запуск якої буде проведений в терміналі"
 
@@ -9594,10 +9743,18 @@ msgctxt "tfrmviewer.actshowgraphics.caption"
 msgid "Graphics"
 msgstr "Графіка"
 
+#: tfrmviewer.actshowoffice.caption
+msgid "Office XML (text only)"
+msgstr ""
+
 #: tfrmviewer.actshowplugins.caption
 msgctxt "tfrmviewer.actshowplugins.caption"
 msgid "Plugins"
 msgstr "Плагіни"
+
+#: tfrmviewer.actshowtransparency.caption
+msgid "Show transparenc&y"
+msgstr ""
 
 #: tfrmviewer.actstretchimage.caption
 msgctxt "TFRMVIEWER.ACTSTRETCHIMAGE.CAPTION"
@@ -9612,6 +9769,10 @@ msgstr "Розтягнути зображення"
 msgctxt "tfrmviewer.actstretchonlylarge.caption"
 msgid "Stretch only large"
 msgstr "Тільки великі в розмір вікна"
+
+#: tfrmviewer.actwraptext.caption
+msgid "&Wrap text"
+msgstr ""
 
 #: tfrmviewer.actzoom.caption
 msgid "Zoom"
@@ -10211,6 +10372,10 @@ msgstr "_DroppedUnicodeUTF8text"
 msgid " Adds: "
 msgstr "Додано:"
 
+#: ulng.rsdiffcomparing
+msgid "Comparing..."
+msgstr ""
+
 #: ulng.rsdiffdeletes
 msgid " Deletes: "
 msgstr "Видалено:"
@@ -10226,6 +10391,26 @@ msgstr "Співпадінь:"
 #: ulng.rsdiffmodifies
 msgid " Modifies: "
 msgstr "Змінено:"
+
+#: ulng.rsdifftextdifferenceencoding
+#, fuzzy
+msgctxt "ulng.rsdifftextdifferenceencoding"
+msgid "Encoding"
+msgstr "Кодування"
+
+#: ulng.rsdifftextdifferencelineending
+msgid "Line-endings"
+msgstr ""
+
+#: ulng.rsdifftextidentical
+msgid "The text is identical, but the following options are used:"
+msgstr ""
+
+#: ulng.rsdifftextidenticalnotmatch
+msgid ""
+"The text is identical, but the files do not match!\n"
+"The following differences were found:\n"
+msgstr ""
 
 #: ulng.rsdlgbuttonabort
 msgid "Ab&ort"
@@ -10245,7 +10430,7 @@ msgid "A&uto-rename source files"
 msgstr "Авто-перейменування вихідних файлів"
 
 #: ulng.rsdlgbuttonautorenametarget
-msgid "A&uto-rename target files"
+msgid "Auto-rename tar&get files"
 msgstr ""
 
 #: ulng.rsdlgbuttoncancel
@@ -10638,6 +10823,10 @@ msgstr "Поточний &шлях"
 msgid "Search Results Font"
 msgstr ""
 
+#: ulng.rsfontusagestatusbar
+msgid "Status Bar Font"
+msgstr ""
+
 #: ulng.rsfontusagetreeviewmenu
 msgid "Tree View Menu Font"
 msgstr ""
@@ -10908,10 +11097,6 @@ msgstr "<За замовчуванням>"
 msgid "Octal"
 msgstr "Восьмирічний"
 
-#: ulng.rsmnucopynetnamestoclip
-msgid "Copy names with UNC path"
-msgstr "Копіювати в буфер імена з UNC-шляхом"
-
 #: ulng.rsmnucreateshortcut
 msgid "Create Shortcut..."
 msgstr "Створити ярлик..."
@@ -11013,6 +11198,10 @@ msgstr ""
 "\"%s\"\n"
 "\n"
 "Бажаєте зберегти пошкоджений файл в будь-якому разі?\n"
+
+#: ulng.rsmsgcanceloperation
+msgid "Are you sure that you want to cancel this operation?"
+msgstr ""
 
 #: ulng.rsmsgcannotcopymoveitself
 msgid "You can not copy/move a file \"%s\" to itself!"
@@ -12014,9 +12203,17 @@ msgstr ""
 msgid "Enter location and filename where to save a TC Toolbar file"
 msgstr "Введіть розташування і ім'я файлу, куди зберегти файл панелі інструментів ТС"
 
+#: ulng.rsmsgterminaldisabled
+msgid "Built-in terminal window disabled. Do you want to enable it?"
+msgstr ""
+
 #: ulng.rsmsgterminateprocess
 msgid "WARNING: Terminating a process can cause undesired results including loss of data and system instability. The process will not be given the chance to save its state or data before it is terminated. Are you sure you want to terminate the process?"
 msgstr "УВАГА! Завершення процесу може привести до небажаних результатів, в тому числі до втрати даних або до нестабільної роботи системи. Ви дійсно хочете завершити процес?"
+
+#: ulng.rsmsgtestarchive
+msgid "Do you want to test selected archives?"
+msgstr ""
 
 #: ulng.rsmsgthisisnowinclipboard
 msgid "\"%s\" is now in the clipboard"
@@ -13910,6 +14107,10 @@ msgctxt "ulng.rsvfsnetwork"
 msgid "Network"
 msgstr "Мережа"
 
+#: ulng.rsvfsrecyclebin
+msgid "Recycle Bin"
+msgstr ""
+
 #: ulng.rsviewabouttext
 msgid "Internal Viewer of Double Commander."
 msgstr "Внутрішній переглядач Double Commander."
@@ -13955,4 +14156,8 @@ msgstr "Кількість замін: %d"
 #: ulng.rszeroreplacement
 msgid "No replacement took place."
 msgstr "Заміна не відбулася."
+
+#: umaincommands.rsfavoritetabs_setupnotexist
+msgid "No setup named \"%s\""
+msgstr ""
 

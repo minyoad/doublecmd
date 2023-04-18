@@ -11,13 +11,17 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Native-Language: 简体中文\n"
 
+#: foptionscolors.rsdarkmodeoptions
+msgid "Auto;Enabled;Disabled"
+msgstr "自动;启用;禁用"
+
 #: fsyncdirsdlg.rscomparingpercent
 msgid "Comparing... %d%% (ESC to cancel)"
 msgstr "正在比较... %d%%（按下 ESC 键可取消）"
 
 #: fsyncdirsdlg.rsdeleteleft
 msgid "Left: Delete %d file(s)"
-msgstr ""
+msgstr "左侧: 删除%d个文件"
 
 #: fsyncdirsdlg.rsdeleteright
 msgid "Right: Delete %d file(s)"
@@ -85,6 +89,10 @@ msgstr "保留链接(&L)"
 msgid "&Reserve space"
 msgstr "保留空间(&R)"
 
+#: tfilesystemcopymoveoperationoptionsui.chkcopyonwrite.caption
+msgid "Copy on write"
+msgstr "写入时复制"
+
 #: tfilesystemcopymoveoperationoptionsui.chkverify.caption
 msgid "&Verify"
 msgstr "校验(&V)"
@@ -136,7 +144,7 @@ msgstr "构建"
 #: tfrmabout.lblcommit.caption
 msgctxt "tfrmabout.lblcommit.caption"
 msgid "Commit"
-msgstr ""
+msgstr "提交"
 
 #: tfrmabout.lblfreepascalver.caption
 msgctxt "tfrmabout.lblfreepascalver.caption"
@@ -522,6 +530,12 @@ msgctxt "tfrmdiffer.acteditredo.caption"
 msgid "Redo"
 msgstr "重做"
 
+#: tfrmdiffer.acteditredo.hint
+#, fuzzy
+msgctxt "tfrmdiffer.acteditredo.hint"
+msgid "Redo"
+msgstr "重做"
+
 #: tfrmdiffer.acteditselectall.caption
 msgid "Select &All"
 msgstr "选择全部(&A)"
@@ -531,10 +545,64 @@ msgctxt "tfrmdiffer.acteditundo.caption"
 msgid "Undo"
 msgstr "撤销"
 
+#: tfrmdiffer.acteditundo.hint
+#, fuzzy
+msgctxt "tfrmdiffer.acteditundo.hint"
+msgid "Undo"
+msgstr "撤销"
+
 #: tfrmdiffer.actexit.caption
 msgctxt "tfrmdiffer.actexit.caption"
 msgid "E&xit"
 msgstr "退出(&X)"
+
+#: tfrmdiffer.actfind.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actfind.caption"
+msgid "&Find"
+msgstr "查找(&F)"
+
+#: tfrmdiffer.actfind.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actfind.hint"
+msgid "Find"
+msgstr "查找"
+
+#: tfrmdiffer.actfindnext.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actfindnext.caption"
+msgid "Find next"
+msgstr "查找下一个"
+
+#: tfrmdiffer.actfindnext.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actfindnext.hint"
+msgid "Find next"
+msgstr "查找下一个"
+
+#: tfrmdiffer.actfindprev.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actfindprev.caption"
+msgid "Find previous"
+msgstr "查找上一个"
+
+#: tfrmdiffer.actfindprev.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actfindprev.hint"
+msgid "Find previous"
+msgstr "查找上一个"
+
+#: tfrmdiffer.actfindreplace.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actfindreplace.caption"
+msgid "&Replace"
+msgstr "替换(&R)"
+
+#: tfrmdiffer.actfindreplace.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actfindreplace.hint"
+msgid "Replace"
+msgstr "替换"
 
 #: tfrmdiffer.actfirstdifference.caption
 msgctxt "tfrmdiffer.actfirstdifference.caption"
@@ -545,6 +613,18 @@ msgstr "第一处差异"
 msgctxt "tfrmdiffer.actfirstdifference.hint"
 msgid "First Difference"
 msgstr "第一处差异"
+
+#: tfrmdiffer.actgotoline.caption
+#, fuzzy
+msgctxt "tfrmdiffer.actgotoline.caption"
+msgid "Goto Line..."
+msgstr "跳转到指定行..."
+
+#: tfrmdiffer.actgotoline.hint
+#, fuzzy
+msgctxt "tfrmdiffer.actgotoline.hint"
+msgid "Goto Line"
+msgstr "跳转到行"
 
 #: tfrmdiffer.actignorecase.caption
 msgid "Ignore Case"
@@ -837,6 +917,7 @@ msgid "Find previous"
 msgstr "查找上一个"
 
 #: tfrmeditor.acteditgotoline.caption
+msgctxt "tfrmeditor.acteditgotoline.caption"
 msgid "Goto Line..."
 msgstr "跳转到指定行..."
 
@@ -891,6 +972,7 @@ msgid "Redo"
 msgstr "重做"
 
 #: tfrmeditor.acteditrplc.caption
+msgctxt "tfrmeditor.acteditrplc.caption"
 msgid "&Replace"
 msgstr "替换(&R)"
 
@@ -906,7 +988,7 @@ msgstr "取消(&A)"
 #: tfrmeditor.acteditselectall.hint
 msgctxt "tfrmeditor.acteditselectall.hint"
 msgid "Select All"
-msgstr "选择全部"
+msgstr "全选"
 
 #: tfrmeditor.acteditundo.caption
 msgctxt "TFRMEDITOR.ACTEDITUNDO.CAPTION"
@@ -1039,6 +1121,10 @@ msgctxt "tfrmeditsearchreplace.buttonpanel.okbutton.caption"
 msgid "&OK"
 msgstr "确定(&O)"
 
+#: tfrmeditsearchreplace.cbmultiline.caption
+msgid "&Multiline pattern"
+msgstr "多行模式(&M)"
+
 #: tfrmeditsearchreplace.cbsearchcasesensitive.caption
 msgid "C&ase sensitivity"
 msgstr "区分大小写(&A)"
@@ -1078,7 +1164,7 @@ msgstr "方向"
 
 #: tfrmelevation.chkelevateall.caption
 msgid "Do this for &all current objects"
-msgstr ""
+msgstr "对所有当前对象执行此操作(&A)"
 
 #: tfrmextractdlg.caption
 msgid "Unpack files"
@@ -1155,7 +1241,7 @@ msgstr "当前操作："
 #: tfrmfileop.lblfrom.caption
 msgctxt "TFRMFILEOP.LBLFROM.CAPTION"
 msgid "From:"
-msgstr "从："
+msgstr "从:"
 
 #: tfrmfileop.lblto.caption
 msgid "To:"
@@ -1558,6 +1644,10 @@ msgstr "查找不包含该文本的文件(&O)"
 msgid "N&ot older than:"
 msgstr "不早于(&O)："
 
+#: tfrmfinddlg.cbofficexml.caption
+msgid "Offi&ce XML"
+msgstr ""
+
 #: tfrmfinddlg.cbopenedtabs.caption
 msgid "Opened tabs"
 msgstr "打开的标签"
@@ -1596,23 +1686,23 @@ msgstr "使用搜索插件(&U)："
 
 #: tfrmfinddlg.chkduplicatecontent.caption
 msgid "same content"
-msgstr ""
+msgstr "相同的内容"
 
 #: tfrmfinddlg.chkduplicatehash.caption
 msgid "same hash"
-msgstr ""
+msgstr "相同的哈希值"
 
 #: tfrmfinddlg.chkduplicatename.caption
 msgid "same name"
-msgstr ""
+msgstr "相同的名称"
 
 #: tfrmfinddlg.chkduplicates.caption
 msgid "Find du&plicate files:"
-msgstr ""
+msgstr "查找重复文件(&P):"
 
 #: tfrmfinddlg.chkduplicatesize.caption
 msgid "same size"
-msgstr ""
+msgstr "相同大小"
 
 #: tfrmfinddlg.chkhex.caption
 msgctxt "tfrmfinddlg.chkhex.caption"
@@ -1782,7 +1872,7 @@ msgstr "查找"
 
 #: tfrmfindview.cbbackwards.caption
 msgid "&Backwards"
-msgstr ""
+msgstr "向后(&B)"
 
 #: tfrmfindview.cbcasesens.caption
 msgid "C&ase sensitive"
@@ -1802,7 +1892,7 @@ msgstr "十六进制"
 
 #: tfrmgioauthdialog.lbldomain.caption
 msgid "Domain:"
-msgstr ""
+msgstr "域名:"
 
 #: tfrmgioauthdialog.lblpassword.caption
 #, fuzzy
@@ -1818,11 +1908,11 @@ msgstr "用户名："
 
 #: tfrmgioauthdialog.rbanonymous.caption
 msgid "Connect anonymously"
-msgstr ""
+msgstr "匿名连接"
 
 #: tfrmgioauthdialog.rbconnetas.caption
 msgid "Connect as user:"
-msgstr ""
+msgstr "以用户身份连接:"
 
 #: tfrmhardlink.btncancel.caption
 msgctxt "TFRMHARDLINK.BTNCANCEL.CAPTION"
@@ -1945,7 +2035,7 @@ msgstr "复制路径到命令行"
 
 #: tfrmmain.actaddplugin.caption
 msgid "Add Plugin"
-msgstr ""
+msgstr "添加插件"
 
 #: tfrmmain.actbenchmark.caption
 msgid "&Benchmark"
@@ -2126,6 +2216,10 @@ msgstr "复制包含完整路径的文件名(&P)"
 msgid "Copy &Filename(s) to Clipboard"
 msgstr "复制文件名到剪贴板(&F)"
 
+#: tfrmmain.actcopynetnamestoclip.caption
+msgid "Copy names with UNC path"
+msgstr "使用网络路径复制名称"
+
 #: tfrmmain.actcopynoask.caption
 msgid "Copy files without asking for confirmation"
 msgstr "复制文件时不需要确认"
@@ -2176,6 +2270,10 @@ msgid "Directory &Hotlist"
 msgstr "常用文件夹列表(&H)"
 
 #: tfrmmain.actdoanycmcommand.caption
+msgid "Execute &internal command..."
+msgstr "执行内部命令(&I)..."
+
+#: tfrmmain.actdoanycmcommand.hint
 msgid "Select any command and execute it"
 msgstr "选择任何命令并执行"
 
@@ -2235,7 +2333,7 @@ msgstr "平面视图(&F)"
 
 #: tfrmmain.actflatviewsel.caption
 msgid "&Flat view, only selected"
-msgstr ""
+msgstr "平面视图(&F),只被选中"
 
 #: tfrmmain.actfocuscmdline.caption
 msgid "Focus command line"
@@ -2259,7 +2357,7 @@ msgstr "切换当前文件列表和树状视图（如果已启用）"
 
 #: tfrmmain.actgotofirstentry.caption
 msgid "Place cursor on first folder or file"
-msgstr ""
+msgstr "将光标放在第一个文件夹或文件上"
 
 #: tfrmmain.actgotofirstfile.caption
 msgid "Place cursor on first file in list"
@@ -2267,7 +2365,7 @@ msgstr "将光标置于列表中的第一个文件"
 
 #: tfrmmain.actgotolastentry.caption
 msgid "Place cursor on last folder or file"
-msgstr ""
+msgstr "将光标放在最后一个文件夹或文件上"
 
 #: tfrmmain.actgotolastfile.caption
 msgid "Place cursor on last file in list"
@@ -2275,11 +2373,11 @@ msgstr "将光标置于列表中的最后一个文件"
 
 #: tfrmmain.actgotonextentry.caption
 msgid "Place cursor on next folder or file"
-msgstr ""
+msgstr "将光标放在下一个文件夹或文件上"
 
 #: tfrmmain.actgotopreventry.caption
 msgid "Place cursor on previous folder or file"
-msgstr ""
+msgstr "将光标放在上一个文件夹或文件上"
 
 #: tfrmmain.acthardlink.caption
 msgid "Create &Hard Link..."
@@ -2349,6 +2447,14 @@ msgstr "左侧面板缩略图视图"
 msgid "Load tabs from Favorite Tabs"
 msgstr "从收藏夹标签加载标签"
 
+#: tfrmmain.actloadlist.caption
+msgid "Load List"
+msgstr "载入列表"
+
+#: tfrmmain.actloadlist.hint
+msgid "Load list of files/folders from the specified text file"
+msgstr "从指定的文本文件加载文件/文件夹列表"
+
 #: tfrmmain.actloadselectionfromclip.caption
 msgid "Load Selection from Clip&board"
 msgstr "从剪贴板加载选择项(&B)"
@@ -2404,6 +2510,14 @@ msgstr "全部不选(&U)"
 #: tfrmmain.actminimize.caption
 msgid "Minimize window"
 msgstr "最小化窗口"
+
+#: tfrmmain.actmovetableft.caption
+msgid "Move current tab to the left"
+msgstr "将当前选项卡向左移动"
+
+#: tfrmmain.actmovetabright.caption
+msgid "Move current tab to the right"
+msgstr "将当前选项卡向右移动"
 
 #: tfrmmain.actmultirename.caption
 msgid "Multi-&Rename Tool"
@@ -2700,6 +2814,14 @@ msgstr "启用/禁用忽略列表文件以不显示文件名"
 #: tfrmmain.actsymlink.caption
 msgid "Create Symbolic &Link..."
 msgstr "创建符号链接(&L)..."
+
+#: tfrmmain.actsyncchangedir.caption
+msgid "Synchronous navigation"
+msgstr "同步导航"
+
+#: tfrmmain.actsyncchangedir.hint
+msgid "Synchronous directory changing in both panels"
+msgstr "两个面板中的同步目录更改"
 
 #: tfrmmain.actsyncdirs.caption
 msgid "Syn&chronize dirs..."
@@ -3174,6 +3296,7 @@ msgid "&OK"
 msgstr "确定(&O)"
 
 #: tfrmmaskinputdlg.chkcasesensitive.caption
+msgctxt "tfrmmaskinputdlg.chkcasesensitive.caption"
 msgid "Case sensitive"
 msgstr "区分大小写"
 
@@ -3193,19 +3316,13 @@ msgstr "输入掩码："
 msgid "O&r select predefined selection type:"
 msgstr "或选择预定义的选择类型(&R)："
 
-#: tfrmmkdir.btncancel.caption
-msgctxt "TFRMMKDIR.BTNCANCEL.CAPTION"
-msgid "&Cancel"
-msgstr "取消(&C)"
-
-#: tfrmmkdir.btnok.caption
-msgctxt "TFRMMKDIR.BTNOK.CAPTION"
-msgid "&OK"
-msgstr "确定(&O)"
-
 #: tfrmmkdir.caption
 msgid "Create new directory"
 msgstr "创建新文件夹"
+
+#: tfrmmkdir.cbextended.caption
+msgid "&Extended syntax"
+msgstr "扩展语法(&E)"
 
 #: tfrmmkdir.lblmakedir.caption
 msgid "&Input new directory name:"
@@ -3239,7 +3356,7 @@ msgstr ""
 #: tfrmmodview.caption
 msgctxt "tfrmmodview.caption"
 msgid "New Size"
-msgstr "新的大小"
+msgstr "新尺寸"
 
 #: tfrmmodview.lblheight.caption
 msgid "Height :"
@@ -3368,7 +3485,7 @@ msgstr "删除"
 
 #: tfrmmultirename.actdropdownpresetlist.caption
 msgid "Drop Down Presets List"
-msgstr ""
+msgstr "下拉预设列表"
 
 #: tfrmmultirename.acteditnames.caption
 msgid "Edit Names..."
@@ -3376,7 +3493,7 @@ msgstr "编辑名称..."
 
 #: tfrmmultirename.acteditnewnames.caption
 msgid "Edit Current New Names..."
-msgstr ""
+msgstr "编辑当前的新名称..."
 
 #: tfrmmultirename.actextextmask.caption
 msgctxt "tfrmmultirename.actextextmask.caption"
@@ -3395,11 +3512,11 @@ msgstr "编辑(&E)"
 
 #: tfrmmultirename.actinvokerelativepath.caption
 msgid "Invoke Relative Path Menu"
-msgstr ""
+msgstr "调用相对路径菜单"
 
 #: tfrmmultirename.actloadlastpreset.caption
 msgid "Load Last Preset"
-msgstr ""
+msgstr "加载上次预设"
 
 #: tfrmmultirename.actloadnamesfromfile.caption
 msgid "Load Names from File..."
@@ -3407,43 +3524,43 @@ msgstr "从文件加载名称..."
 
 #: tfrmmultirename.actloadpreset.caption
 msgid "Load Preset by Name or Index"
-msgstr ""
+msgstr "按名称或索引加载预设"
 
 #: tfrmmultirename.actloadpreset1.caption
 msgid "Load Preset 1"
-msgstr ""
+msgstr "加载预设 1"
 
 #: tfrmmultirename.actloadpreset2.caption
 msgid "Load Preset 2"
-msgstr ""
+msgstr "加载预设 2"
 
 #: tfrmmultirename.actloadpreset3.caption
 msgid "Load Preset 3"
-msgstr ""
+msgstr "加载预设 3"
 
 #: tfrmmultirename.actloadpreset4.caption
 msgid "Load Preset 4"
-msgstr ""
+msgstr "加载预设 4"
 
 #: tfrmmultirename.actloadpreset5.caption
 msgid "Load Preset 5"
-msgstr ""
+msgstr "加载预设 5"
 
 #: tfrmmultirename.actloadpreset6.caption
 msgid "Load Preset 6"
-msgstr ""
+msgstr "加载预设 6"
 
 #: tfrmmultirename.actloadpreset7.caption
 msgid "Load Preset 7"
-msgstr ""
+msgstr "加载预设 7"
 
 #: tfrmmultirename.actloadpreset8.caption
 msgid "Load Preset 8"
-msgstr ""
+msgstr "加载预设 8"
 
 #: tfrmmultirename.actloadpreset9.caption
 msgid "Load Preset 9"
-msgstr ""
+msgstr "加载预设 9"
 
 #: tfrmmultirename.actnameextmask.caption
 msgctxt "tfrmmultirename.actnameextmask.caption"
@@ -3492,7 +3609,7 @@ msgstr "另存为(A)..."
 
 #: tfrmmultirename.actshowpresetsmenu.caption
 msgid "Show Preset Menu"
-msgstr ""
+msgstr "显示预设菜单"
 
 #: tfrmmultirename.actsortpresets.caption
 msgid "Sort"
@@ -3510,21 +3627,39 @@ msgstr "时间"
 
 #: tfrmmultirename.actviewrenamelogfile.caption
 msgid "View Rename Log File"
-msgstr ""
+msgstr "查看重命名日志文件"
 
 #: tfrmmultirename.caption
 msgctxt "tfrmmultirename.caption"
 msgid "Multi-Rename Tool"
 msgstr "批量重命名"
 
+#: tfrmmultirename.cbcasesens.caption
+msgid "A≠a"
+msgstr ""
+
+#: tfrmmultirename.cbcasesens.hint
+#, fuzzy
+msgctxt "tfrmmultirename.cbcasesens.hint"
+msgid "Case sensitive"
+msgstr "区分大小写"
+
 #: tfrmmultirename.cblog.caption
 #, fuzzy
 #| msgid "Ena&ble"
 msgid "&Log result"
-msgstr "启用(&B)"
+msgstr "记录结果(&L)"
 
 #: tfrmmultirename.cblogappend.caption
 msgid "Append"
+msgstr "附加"
+
+#: tfrmmultirename.cbonlyfirst.caption
+msgid "1x"
+msgstr ""
+
+#: tfrmmultirename.cbonlyfirst.hint
+msgid "Replace only once per file"
 msgstr ""
 
 #: tfrmmultirename.cbregexp.caption
@@ -4016,6 +4151,10 @@ msgstr "固定列数"
 #: tfrmoptionsbriefview.rbusefixedwidth.caption
 msgid "Fixed columns width"
 msgstr "固定列宽"
+
+#: tfrmoptionscolors.rgdarkmode.caption
+msgid "Dark mode"
+msgstr ""
 
 #: tfrmoptionscolumnsview.cbcuttexttocolwidth.caption
 msgid "Cut &text to column width"
@@ -4527,7 +4666,7 @@ msgstr "背景色 2："
 #, fuzzy
 #| msgid "Con&figure columns view:"
 msgid "&Columns view:"
-msgstr "配置详细信息视图(&V)"
+msgstr "列视图(&C)"
 
 #: tfrmoptionscustomcolumns.lblcurrentcolumn.caption
 msgid "[Current Column Name]"
@@ -4544,7 +4683,7 @@ msgstr "光标文本："
 
 #: tfrmoptionscustomcolumns.lblfilesystem.caption
 msgid "&File system:"
-msgstr ""
+msgstr "(&F)文件系统:"
 
 #: tfrmoptionscustomcolumns.lblfontname.caption
 msgid "Font:"
@@ -4891,7 +5030,7 @@ msgstr "转到 TC 配置相关信息(&C)"
 
 #: tfrmoptionsdirectoryhotlist.mihotdirtestmenu.caption
 msgid "HotDirTestMenu"
-msgstr ""
+msgstr "常用目录测试菜单"
 
 #: tfrmoptionsdirectoryhotlist.miimportfromhotlistfile.caption
 msgid "from a Directory &Hotlist file (.hotlist)"
@@ -4957,28 +5096,28 @@ msgstr "从主面板添加"
 
 #: tfrmoptionsdirectoryhotlistextra.btnpathtoberelativetoall.caption
 msgid "Apply current settings to directory hotlist"
-msgstr ""
+msgstr "将当前设置应用到常用文件夹列表"
 
 #: tfrmoptionsdirectoryhotlistextra.ckbdirectoryhotlistsource.caption
 msgid "Source"
-msgstr ""
+msgstr "源"
 
 #: tfrmoptionsdirectoryhotlistextra.ckbdirectoryhotlisttarget.caption
 msgid "Target"
-msgstr ""
+msgstr "目标"
 
 #: tfrmoptionsdirectoryhotlistextra.gbdirectoryhotlistoptionsextra.caption
 msgctxt "tfrmoptionsdirectoryhotlistextra.gbdirectoryhotlistoptionsextra.caption"
 msgid "Paths"
-msgstr ""
+msgstr "路径"
 
 #: tfrmoptionsdirectoryhotlistextra.lbdirectoryhotlistfilenamestyle.caption
 msgid "Way to set paths when adding them:"
-msgstr ""
+msgstr "添加路径时设置路径的方法:"
 
 #: tfrmoptionsdirectoryhotlistextra.lblapplysettingsfor.caption
 msgid "Do this for paths of:"
-msgstr ""
+msgstr "对以下路径执行此操作:"
 
 #: tfrmoptionsdirectoryhotlistextra.lbpathtoberelativeto.caption
 #, fuzzy
@@ -5044,7 +5183,7 @@ msgstr "当使用 <Enter> 键创建新行时，允许缩进插入符号，前导
 
 #: tfrmoptionseditor.chkrightedge.caption
 msgid "Right margin:"
-msgstr ""
+msgstr "右边距:"
 
 #: tfrmoptionseditor.chkscrollpastendline.caption
 msgid "Caret past end of line"
@@ -5381,7 +5520,7 @@ msgstr "将选择导出到传统的 .tab 文件"
 
 #: tfrmoptionsfavoritetabs.mifavoritetabstestmenu.caption
 msgid "FavoriteTabsTestMenu"
-msgstr ""
+msgstr "收藏夹测试菜单"
 
 #: tfrmoptionsfavoritetabs.miimportlegacytabfilesaccsetting.caption
 msgid "Import legacy .tab file(s) according to default setting"
@@ -5427,7 +5566,7 @@ msgstr "重命名"
 #: tfrmoptionsfavoritetabs.misorteverything.caption
 msgctxt "tfrmoptionsfavoritetabs.misorteverything.caption"
 msgid "...everything, from A to Z!"
-msgstr "...一切，从 A 到 Z！"
+msgstr "...全部，从 A 到 Z！"
 
 #: tfrmoptionsfavoritetabs.misortsinglegroup.caption
 msgctxt "tfrmoptionsfavoritetabs.misortsinglegroup.caption"
@@ -5679,7 +5818,7 @@ msgstr "点击我更改图标！"
 
 #: tfrmoptionsfileassocextra.btnpathtoberelativetoall.caption
 msgid "Apply current settings to all current configured filenames and paths"
-msgstr ""
+msgstr "将当前设置应用于所有当前配置的文件名和路径"
 
 #: tfrmoptionsfileassocextra.cbexecuteviashell.caption
 msgctxt "tfrmoptionsfileassocextra.cbexecuteviashell.caption"
@@ -5716,7 +5855,7 @@ msgstr "通过终端执行并保持打开状态"
 #: tfrmoptionsfileassocextra.ckbfileassoccommand.caption
 msgctxt "tfrmoptionsfileassocextra.ckbfileassoccommand.caption"
 msgid "Commands"
-msgstr ""
+msgstr "命令"
 
 #: tfrmoptionsfileassocextra.ckbfileassocicons.caption
 #, fuzzy
@@ -5727,7 +5866,7 @@ msgstr "图标"
 #: tfrmoptionsfileassocextra.ckbfileassocstartpath.caption
 msgctxt "tfrmoptionsfileassocextra.ckbfileassocstartpath.caption"
 msgid "Starting paths"
-msgstr ""
+msgstr "起始路径"
 
 #: tfrmoptionsfileassocextra.gbextendedcontextmenuoptions.caption
 msgid "Extended options items:"
@@ -5736,16 +5875,16 @@ msgstr "扩展选项项目："
 #: tfrmoptionsfileassocextra.gbtoolbaroptionsextra.caption
 msgctxt "tfrmoptionsfileassocextra.gbtoolbaroptionsextra.caption"
 msgid "Paths"
-msgstr ""
+msgstr "路径"
 
 #: tfrmoptionsfileassocextra.lbfileassocfilenamestyle.caption
 msgctxt "tfrmoptionsfileassocextra.lbfileassocfilenamestyle.caption"
 msgid "Way to set paths when adding elements for icons, commands and starting paths:"
-msgstr ""
+msgstr "为图标,命令,和起始路径添加元素时设置路径的方法:"
 
 #: tfrmoptionsfileassocextra.lblapplysettingsfor.caption
 msgid "Do this for files and path for:"
-msgstr ""
+msgstr "对文件和路径执行此操作"
 
 #: tfrmoptionsfileassocextra.lbpathtoberelativeto.caption
 #, fuzzy
@@ -5796,6 +5935,10 @@ msgstr "在复制/移动对话框显示标签选择面板(&W)"
 #: tfrmoptionsfileoperations.cbskipfileoperror.caption
 msgid "S&kip file operations errors and write them to log window"
 msgstr "忽略文件操作错误，并记录到日志窗口(&K)"
+
+#: tfrmoptionsfileoperations.cbtestarchiveconfirmation.caption
+msgid "Test archive operation"
+msgstr "测试存档操作"
 
 #: tfrmoptionsfileoperations.cbverifychecksumconfirmation.caption
 msgid "Verify checksum operation"
@@ -6042,13 +6185,17 @@ msgstr "日期时间格式(&D)："
 msgid "File si&ze format:"
 msgstr "文件大小格式(&Z)："
 
+#: tfrmoptionsfilesviews.lblfootersizeformat.caption
+msgid "&Footer format:"
+msgstr "页脚格式(&F):"
+
 #: tfrmoptionsfilesviews.lblgigabyte.caption
 msgid "&Gigabyte:"
 msgstr "吉字节(&G)："
 
-#: tfrmoptionsfilesviews.lblheaderfootersizeformat.caption
-msgid "&Header/footer format:"
-msgstr "顶部/状态栏格式(&H)："
+#: tfrmoptionsfilesviews.lblheadersizeformat.caption
+msgid "&Header format:"
+msgstr "头部格式(&H):"
 
 #: tfrmoptionsfilesviews.lblkilobyte.caption
 msgid "&Kilobyte:"
@@ -6323,7 +6470,7 @@ msgstr "参数"
 
 #: tfrmoptionshotkeys.stghotkeys.columns[2].title.caption
 msgid "Controls"
-msgstr ""
+msgstr "控件"
 
 #: tfrmoptionsicons.cbiconsexclude.caption
 msgctxt "TFRMOPTIONSICONS.CBICONSEXCLUDE.CAPTION"
@@ -6520,7 +6667,7 @@ msgstr "显示两个驱动按钮栏"
 
 #: tfrmoptionslayout.chkshowmiddletoolbar.caption
 msgid "Show middle toolbar"
-msgstr ""
+msgstr "显示中间工具栏"
 
 #: tfrmoptionslayout.gbscreenlayout.caption
 msgid " Screen layout "
@@ -6571,7 +6718,7 @@ msgstr "创建日志文件(&R)："
 
 #: tfrmoptionslog.cblogfilecount.caption
 msgid "Maximum log file count"
-msgstr ""
+msgstr "最大日志文件数"
 
 #: tfrmoptionslog.cbloginfo.caption
 msgid "Log &information messages"
@@ -6638,6 +6785,14 @@ msgstr "创建新文件的编码："
 #: tfrmoptionsmisc.chkgotoroot.caption
 msgid "Always &go to the root of a drive when changing drives"
 msgstr "更换驱动器时，总是转到根文件夹(&G)"
+
+#: tfrmoptionsmisc.chkshowcurdirtitlebar.caption
+msgid "Show &current directory in the main window title bar"
+msgstr "在主窗口标题栏中显示当前目录(&C)"
+
+#: tfrmoptionsmisc.chkshowsplashform.caption
+msgid "Show &splash screen"
+msgstr ""
 
 #: tfrmoptionsmisc.chkshowwarningmessages.caption
 msgid "Show &warning messages (\"OK\" button only)"
@@ -6757,39 +6912,39 @@ msgstr "查看日志文件内容"
 
 #: tfrmoptionsmultirename.ckbdailyindividualdirmultrenlog.caption
 msgid "Individual directories per day"
-msgstr ""
+msgstr "每天用单独的目录"
 
 #: tfrmoptionsmultirename.ckbfilenamewithfullpathinlog.caption
 msgid "Log filenames with full path"
-msgstr ""
+msgstr "带有完整路径的日志文件名"
 
 #: tfrmoptionsmultirename.ckbshowmenubarontop.caption
 msgid "Show menu bar on top "
-msgstr ""
+msgstr "在顶部显示菜单栏 "
 
 #: tfrmoptionsmultirename.gbsaverenaminglog.caption
 msgid "Rename log"
-msgstr ""
+msgstr "重命名日志"
 
 #: tfrmoptionsmultirename.lbinvalidcharreplacement.caption
 msgid "Replace invalid filename character b&y"
-msgstr ""
+msgstr "替换无效的文件名字符(&B)"
 
 #: tfrmoptionsmultirename.rbrenaminglogappendsamefile.caption
 msgid "Append in the same rename log file"
-msgstr ""
+msgstr "追加到同一个重命名日志文件中"
 
 #: tfrmoptionsmultirename.rbrenaminglogperpreset.caption
 msgid "Per preset"
-msgstr ""
+msgstr "每个预设"
 
 #: tfrmoptionsmultirename.rgexitmodifiedpreset.caption
 msgid "Exit with modified preset"
-msgstr ""
+msgstr "退出并修改预设"
 
 #: tfrmoptionsmultirename.rglaunchbehavior.caption
 msgid "Preset at launch"
-msgstr ""
+msgstr "启动时预设"
 
 #: tfrmoptionspluginsbase.btnaddplugin.caption
 msgctxt "tfrmoptionspluginsbase.btnaddplugin.caption"
@@ -6884,7 +7039,7 @@ msgstr "配置："
 
 #: tfrmoptionspluginsgroup.lbllualibraryfilename.caption
 msgid "Lua library file to use:"
-msgstr ""
+msgstr "要使用的 Lua 库文件:"
 
 #: tfrmoptionspluginsgroup.lbpathtoberelativeto.caption
 msgctxt "tfrmoptionspluginsgroup.lbpathtoberelativeto.caption"
@@ -7134,15 +7289,15 @@ msgstr "保存新标签后转到收藏夹标签配置"
 
 #: tfrmoptionstabsextra.cbusefavoritetabsextraoptions.caption
 msgid "Enable Favorite Tabs extra options (select target side when restore, etc.)"
-msgstr "启用收藏夹标签额外选项（恢复时选择目标窗口等）"
+msgstr "启用收藏夹标签扩展选项（恢复时选择目标窗口等）"
 
 #: tfrmoptionstabsextra.gbdefaulttabsavedrestoration.caption
 msgid "Default extra settings when saving new Favorite Tabs:"
-msgstr "默认额外设置，用于保存新的收藏夹标签："
+msgstr "默认扩展设置，用于保存新的收藏夹标签："
 
 #: tfrmoptionstabsextra.gbtabs.caption
 msgid "Folder tabs headers extra"
-msgstr "文件夹标签标题额外设置"
+msgstr "文件夹标签标题扩展设置"
 
 #: tfrmoptionstabsextra.lbldefaultexistingtabstokeep.caption
 msgid "When restoring tab, existing tabs to keep:"
@@ -7172,11 +7327,6 @@ msgstr "{命令} 通常应该在此出现，以反映在终端中运行的命令
 
 #: tfrmoptionsterminal.edrunintermstayopenparams.hint
 msgctxt "tfrmoptionsterminal.edrunintermstayopenparams.hint"
-msgid "{command} should normally be present here to reflect the command to be run in terminal"
-msgstr "{命令} 通常应该在此出现，以反映在终端中运行的命令"
-
-#: tfrmoptionsterminal.edruntermparams.hint
-msgctxt "tfrmoptionsterminal.edruntermparams.hint"
 msgid "{command} should normally be present here to reflect the command to be run in terminal"
 msgstr "{命令} 通常应该在此出现，以反映在终端中运行的命令"
 
@@ -7281,7 +7431,7 @@ msgstr "使用命令报告错误"
 
 #: tfrmoptionstoolbarbase.cbshowcaptions.caption
 msgid "Sho&w captions"
-msgstr ""
+msgstr "显示提示(&W)"
 
 #: tfrmoptionstoolbarbase.edtinternalparameters.hint
 msgid "Enter command parameters, each in a separate line. Press F1 to see help on parameters."
@@ -7338,7 +7488,7 @@ msgstr "开始路径(&S)"
 
 #: tfrmoptionstoolbarbase.lblstyle.caption
 msgid "Style:"
-msgstr ""
+msgstr "风格"
 
 #: tfrmoptionstoolbarbase.lbltooltip.caption
 msgid "&Tooltip:"
@@ -7664,11 +7814,11 @@ msgstr "在当前选择之前"
 
 #: tfrmoptionstoolbarbase.rbseparator.caption
 msgid "Separator"
-msgstr ""
+msgstr "分隔线"
 
 #: tfrmoptionstoolbarbase.rbspace.caption
 msgid "Space"
-msgstr ""
+msgstr "空间"
 
 #: tfrmoptionstoolbarbase.rgtoolitemtype.caption
 msgid "Button type"
@@ -7676,12 +7826,12 @@ msgstr "按钮类型"
 
 #: tfrmoptionstoolbarextra.btnpathtoberelativetoall.caption
 msgid "Apply current settings to all configured filenames and paths"
-msgstr ""
+msgstr "将当前设置应用于所有配置的文件名和路径"
 
 #: tfrmoptionstoolbarextra.ckbtoolbarcommand.caption
 msgctxt "tfrmoptionstoolbarextra.ckbtoolbarcommand.caption"
 msgid "Commands"
-msgstr ""
+msgstr "命令"
 
 #: tfrmoptionstoolbarextra.ckbtoolbaricons.caption
 #, fuzzy
@@ -7692,16 +7842,16 @@ msgstr "图标"
 #: tfrmoptionstoolbarextra.ckbtoolbarstartpath.caption
 msgctxt "tfrmoptionstoolbarextra.ckbtoolbarstartpath.caption"
 msgid "Starting paths"
-msgstr ""
+msgstr "起始路径"
 
 #: tfrmoptionstoolbarextra.gbtoolbaroptionsextra.caption
 msgctxt "tfrmoptionstoolbarextra.gbtoolbaroptionsextra.caption"
 msgid "Paths"
-msgstr ""
+msgstr "路径"
 
 #: tfrmoptionstoolbarextra.lblapplysettingsfor.caption
 msgid "Do this for files and paths for:"
-msgstr ""
+msgstr "对文件和路径执行此操作:"
 
 #: tfrmoptionstoolbarextra.lbpathtoberelativeto.caption
 #, fuzzy
@@ -7712,7 +7862,7 @@ msgstr "相对路径："
 #: tfrmoptionstoolbarextra.lbtoolbarfilenamestyle.caption
 msgctxt "tfrmoptionstoolbarextra.lbtoolbarfilenamestyle.caption"
 msgid "Way to set paths when adding elements for icons, commands and starting paths:"
-msgstr ""
+msgstr "为图标,命令,和起始路径添加元素时设置路径的方法:"
 
 #: tfrmoptionstoolbase.btnrelativetoolpath.hint
 msgctxt "tfrmoptionstoolbase.btnrelativetoolpath.hint"
@@ -7971,7 +8121,7 @@ msgstr "使用和显示选择项目的键盘快捷键"
 
 #: tfrmoptionstreeviewmenucolor.gbfont.caption
 msgid "Font"
-msgstr ""
+msgstr "字体"
 
 #: tfrmoptionstreeviewmenucolor.gblayoutandcolors.caption
 msgid "Layout and colors options:"
@@ -8167,27 +8317,27 @@ msgstr "时间："
 
 #: tfrmprintsetup.caption
 msgid "Print configuration"
-msgstr ""
+msgstr "打印配置"
 
 #: tfrmprintsetup.gbmargins.caption
 msgid "Margins (mm)"
-msgstr ""
+msgstr "边距(毫米)"
 
 #: tfrmprintsetup.lblbottom.caption
 msgid "&Bottom:"
-msgstr ""
+msgstr "底部(&B)"
 
 #: tfrmprintsetup.lblleft.caption
 msgid "&Left:"
-msgstr ""
+msgstr "左侧(&L)"
 
 #: tfrmprintsetup.lblright.caption
 msgid "&Right:"
-msgstr ""
+msgstr "(&R)右侧"
 
 #: tfrmprintsetup.lbltop.caption
 msgid "&Top:"
-msgstr ""
+msgstr "(&T)顶部"
 
 #: tfrmquicksearch.btncancel.caption
 msgctxt "tfrmquicksearch.btncancel.caption"
@@ -8324,11 +8474,11 @@ msgstr "确定(&O)"
 
 #: tfrmselectduplicates.caption
 msgid "Select duplicate files"
-msgstr ""
+msgstr "选择重复文件"
 
 #: tfrmselectduplicates.chkleaveunselected.caption
 msgid "&Leave at least one file in each group unselected:"
-msgstr ""
+msgstr "不选择每个组中的至少一个文件(&L):"
 
 #: tfrmselectduplicates.cmbincludemask.text
 msgctxt "tfrmselectduplicates.cmbincludemask.text"
@@ -8337,7 +8487,7 @@ msgstr ""
 
 #: tfrmselectduplicates.lblexcludemask.caption
 msgid "&Remove selection by name/extension:"
-msgstr ""
+msgstr "按名称/扩展名删除选择(&R):"
 
 #: tfrmselectduplicates.lblfirstmethod.caption
 msgid "&1."
@@ -8345,7 +8495,7 @@ msgstr ""
 
 #: tfrmselectduplicates.lblincludemask.caption
 msgid "Select by &name/extension:"
-msgstr ""
+msgstr "按名称/扩展名选择(&A):"
 
 #: tfrmselectduplicates.lblsecondmethod.caption
 msgid "&2."
@@ -8363,30 +8513,30 @@ msgstr "确定(O)"
 
 #: tfrmselectpathrange.edseparator.editlabel.caption
 msgid "Sep&arator"
-msgstr ""
+msgstr "分隔线(&A)"
 
 #: tfrmselectpathrange.gbcountfrom.caption
 msgid "Count from"
-msgstr ""
+msgstr "统计"
 
 #: tfrmselectpathrange.lblresult.caption
 msgctxt "tfrmselectpathrange.lblresult.caption"
 msgid "Result:"
-msgstr ""
+msgstr "结果:"
 
 #: tfrmselectpathrange.lblselectdirectories.caption
 msgid "&Select the directories to insert (you may select more than one)"
-msgstr ""
+msgstr "(&S)选择要插入的目录(您可以选择多个)"
 
 #: tfrmselectpathrange.rbfirstfromend.caption
 msgctxt "tfrmselectpathrange.rbfirstfromend.caption"
 msgid "The en&d"
-msgstr ""
+msgstr "结束(&D)"
 
 #: tfrmselectpathrange.rbfirstfromstart.caption
 msgctxt "tfrmselectpathrange.rbfirstfromstart.caption"
 msgid "The sta&rt"
-msgstr ""
+msgstr "开始(&R)"
 
 #: tfrmselecttextrange.buttonpanel.cancelbutton.caption
 msgctxt "tfrmselecttextrange.buttonpanel.cancelbutton.caption"
@@ -8400,20 +8550,20 @@ msgstr "确定(O)"
 
 #: tfrmselecttextrange.gbcountfirstfrom.caption
 msgid "Count first from"
-msgstr ""
+msgstr "首先统计"
 
 #: tfrmselecttextrange.gbcountlastfrom.caption
 msgid "Count last from"
-msgstr ""
+msgstr "最后统计"
 
 #: tfrmselecttextrange.gbrangedescription.caption
 msgid "Range description"
-msgstr ""
+msgstr "范围说明"
 
 #: tfrmselecttextrange.lblresult.caption
 msgctxt "tfrmselecttextrange.lblresult.caption"
 msgid "Result:"
-msgstr ""
+msgstr "结果:"
 
 #: tfrmselecttextrange.lblselecttext.caption
 msgid "&Select the characters to insert:"
@@ -8421,29 +8571,29 @@ msgstr "选择要插入的字符(&S)："
 
 #: tfrmselecttextrange.rbdescriptionfirstlast.caption
 msgid "[&First:Last]"
-msgstr ""
+msgstr "[(&F)首先:最后]"
 
 #: tfrmselecttextrange.rbdescriptionfirstlength.caption
 msgid "[First,&Length]"
-msgstr ""
+msgstr "[首先,(&L)长度]"
 
 #: tfrmselecttextrange.rbfirstfromend.caption
 msgctxt "tfrmselecttextrange.rbfirstfromend.caption"
 msgid "The en&d"
-msgstr ""
+msgstr "结束(&D)"
 
 #: tfrmselecttextrange.rbfirstfromstart.caption
 msgctxt "tfrmselecttextrange.rbfirstfromstart.caption"
 msgid "The sta&rt"
-msgstr ""
+msgstr "开始(&R)"
 
 #: tfrmselecttextrange.rblastfromend.caption
 msgid "The &end"
-msgstr ""
+msgstr "结束(&E)"
 
 #: tfrmselecttextrange.rblastfromstart.caption
 msgid "The s&tart"
-msgstr ""
+msgstr "开始(&T)"
 
 #: tfrmsetfileproperties.btncancel.caption
 msgctxt "TFRMSETFILEPROPERTIES.BTNCANCEL.CAPTION"
@@ -8612,11 +8762,11 @@ msgstr "确定(O)"
 
 #: tfrmsortanything.caption
 msgid "frmSortAnything"
-msgstr ""
+msgstr "任意排序"
 
 #: tfrmsortanything.lblsortanything.caption
 msgid "Drag and drop elements to sort them"
-msgstr ""
+msgstr "拖放元素以对它们进行排序"
 
 #: tfrmsplitter.btnrelativeftchoice.hint
 msgctxt "tfrmsplitter.btnrelativeftchoice.hint"
@@ -8677,7 +8827,7 @@ msgstr "构建"
 #: tfrmstartingsplash.lblcommit.caption
 msgctxt "tfrmstartingsplash.lblcommit.caption"
 msgid "Commit"
-msgstr ""
+msgstr "提交"
 
 #: tfrmstartingsplash.lblfreepascalver.caption
 msgctxt "tfrmstartingsplash.lblfreepascalver.caption"
@@ -8747,15 +8897,15 @@ msgstr "链接名(&L)"
 
 #: tfrmsyncdirsdlg.actdeleteboth.caption
 msgid "Delete on both sides"
-msgstr ""
+msgstr "两边都删除"
 
 #: tfrmsyncdirsdlg.actdeleteleft.caption
 msgid "<- Delete left"
-msgstr ""
+msgstr "<- 删除左边"
 
 #: tfrmsyncdirsdlg.actdeleteright.caption
 msgid "-> Delete right"
-msgstr ""
+msgstr "-> 删除右边"
 
 #: tfrmsyncdirsdlg.actselectclear.caption
 msgid "Remove selection"
@@ -8779,11 +8929,11 @@ msgstr "选择复制方向 <- （从右到左）"
 
 #: tfrmsyncdirsdlg.actselectdeleteboth.caption
 msgid "Select for deleting <-> (both)"
-msgstr ""
+msgstr "选择删除<-> (两边都有)"
 
 #: tfrmsyncdirsdlg.actselectdeleteleft.caption
 msgid "Select for deleting <- (left)"
-msgstr ""
+msgstr "选择删除方向 <- (左）"
 
 #: tfrmsyncdirsdlg.actselectdeleteright.caption
 msgid "Select for deleting -> (right)"
@@ -9113,7 +9263,7 @@ msgstr "显示关于消息"
 
 #: tfrmviewer.actautoreload.caption
 msgid "Auto Reload"
-msgstr ""
+msgstr "自动重新加载"
 
 #: tfrmviewer.actchangeencoding.caption
 msgid "Change encoding"
@@ -9222,11 +9372,11 @@ msgstr "预览"
 
 #: tfrmviewer.actprint.caption
 msgid "P&rint..."
-msgstr ""
+msgstr "(&R)打印"
 
 #: tfrmviewer.actprintsetup.caption
 msgid "Print &setup..."
-msgstr ""
+msgstr "打印设置(&S)"
 
 #: tfrmviewer.actreload.caption
 msgctxt "TFRMVIEWER.ACTRELOAD.CAPTION"
@@ -9291,7 +9441,7 @@ msgstr "延迟 5 秒"
 #: tfrmviewer.actselectall.caption
 msgctxt "tfrmviewer.actselectall.caption"
 msgid "Select All"
-msgstr "选择全部"
+msgstr "全选"
 
 #: tfrmviewer.actshowasbin.caption
 msgid "Show as &Bin"
@@ -9319,17 +9469,25 @@ msgstr "换行文本方式显示(&W)"
 
 #: tfrmviewer.actshowcaret.caption
 msgid "Show text c&ursor"
-msgstr ""
+msgstr "显示文本光标(&U)"
 
 #: tfrmviewer.actshowgraphics.caption
 msgctxt "tfrmviewer.actshowgraphics.caption"
 msgid "Graphics"
 msgstr "图形"
 
+#: tfrmviewer.actshowoffice.caption
+msgid "Office XML (text only)"
+msgstr ""
+
 #: tfrmviewer.actshowplugins.caption
 msgctxt "tfrmviewer.actshowplugins.caption"
 msgid "Plugins"
 msgstr "插件"
+
+#: tfrmviewer.actshowtransparency.caption
+msgid "Show transparenc&y"
+msgstr ""
 
 #: tfrmviewer.actstretchimage.caption
 msgid "Stretch"
@@ -9342,6 +9500,10 @@ msgstr "拉伸图像"
 #: tfrmviewer.actstretchonlylarge.caption
 msgid "Stretch only large"
 msgstr "拉伸时仅放大"
+
+#: tfrmviewer.actwraptext.caption
+msgid "&Wrap text"
+msgstr ""
 
 #: tfrmviewer.actzoom.caption
 msgid "Zoom"
@@ -9380,7 +9542,7 @@ msgstr "全屏显示"
 
 #: tfrmviewer.btngiftobmp.hint
 msgid "Export Frame"
-msgstr ""
+msgstr "导出帧"
 
 #: tfrmviewer.btnhightlight.hint
 msgctxt "TFRMVIEWER.BTNHIGHTLIGHT.HINT"
@@ -9389,7 +9551,7 @@ msgstr "高亮"
 
 #: tfrmviewer.btnnextgifframe.hint
 msgid "Next Frame"
-msgstr ""
+msgstr "下一帧"
 
 #: tfrmviewer.btnpaint.hint
 msgctxt "TFRMVIEWER.BTNPAINT.HINT"
@@ -9403,7 +9565,7 @@ msgstr ""
 
 #: tfrmviewer.btnprevgifframe.hint
 msgid "Previous Frame"
-msgstr ""
+msgstr "上一帧"
 
 #: tfrmviewer.btnredeye.hint
 msgid "Red Eyes"
@@ -9441,7 +9603,7 @@ msgstr "编辑(&E)"
 
 #: tfrmviewer.miellipse.caption
 msgid "Ellipse"
-msgstr ""
+msgstr "椭圆"
 
 #: tfrmviewer.miencoding.caption
 msgctxt "TFRMVIEWER.MIENCODING.CAPTION"
@@ -9465,7 +9627,7 @@ msgstr "画笔"
 
 #: tfrmviewer.mirect.caption
 msgid "Rect"
-msgstr ""
+msgstr "矩形"
 
 #: tfrmviewer.mirotate.caption
 msgid "Rotate"
@@ -9616,7 +9778,7 @@ msgstr "确定(&O)"
 
 #: ttfrmconfirmcommandline.lblecommandline.editlabel.caption
 msgid "Command line:"
-msgstr ""
+msgstr "命令行"
 
 #: ttfrmconfirmcommandline.lbleparameters.editlabel.caption
 #, fuzzy
@@ -9626,7 +9788,7 @@ msgstr "参数："
 
 #: ttfrmconfirmcommandline.lblestartpath.editlabel.caption
 msgid "Start path:"
-msgstr ""
+msgstr "开始路径"
 
 #: twcxarchivecopyoperationoptionsui.lblfileexists.caption
 msgctxt "twcxarchivecopyoperationoptionsui.lblfileexists.caption"
@@ -9657,43 +9819,43 @@ msgstr ""
 
 #: uadministrator.rselevationrequired
 msgid "You need to provide administrator permission"
-msgstr ""
+msgstr "您需要提供管理员权限"
 
 #: uadministrator.rselevationrequiredcopy
 msgid "to copy this object:"
-msgstr ""
+msgstr "复制这个对象:"
 
 #: uadministrator.rselevationrequiredcreate
 msgid "to create this object:"
-msgstr ""
+msgstr "创建这个对象:"
 
 #: uadministrator.rselevationrequireddelete
 msgid "to delete this object:"
-msgstr ""
+msgstr "删除这个对象:"
 
 #: uadministrator.rselevationrequiredgetattributes
 msgid "to get attributes of this object:"
-msgstr ""
+msgstr "获取此对象的属性:"
 
 #: uadministrator.rselevationrequiredhardlink
 msgid "to create this hard link:"
-msgstr ""
+msgstr "创建此硬链接:"
 
 #: uadministrator.rselevationrequiredopen
 msgid "to open this object:"
-msgstr ""
+msgstr "打开这个对象:"
 
 #: uadministrator.rselevationrequiredrename
 msgid "to rename this object:"
-msgstr ""
+msgstr "重命名这个对象:"
 
 #: uadministrator.rselevationrequiredsetattributes
 msgid "to set attributes of this object:"
-msgstr ""
+msgstr "设置此对象的属性:"
 
 #: uadministrator.rselevationrequiredsymlink
 msgid "to create this symbolic link:"
-msgstr ""
+msgstr "创建此符号链接:"
 
 #: uexifreader.rsdatetimeoriginal
 msgid "Date taken"
@@ -9904,31 +10066,35 @@ msgstr ""
 
 #: ulng.rsdefaultsuffixdroppedtext
 msgid "_DroppedText"
-msgstr ""
+msgstr "_删除的文本"
 
 #: ulng.rsdefaultsuffixdroppedtexthtmlfilename
 msgid "_DroppedHTMLtext"
-msgstr ""
+msgstr "_删除的 HTML 文本"
 
 #: ulng.rsdefaultsuffixdroppedtextrichtextfilename
 msgid "_DroppedRichtext"
-msgstr ""
+msgstr "_删除的富文本"
 
 #: ulng.rsdefaultsuffixdroppedtextsimplefilename
 msgid "_DroppedSimpleText"
-msgstr ""
+msgstr "_删除的简单文本"
 
 #: ulng.rsdefaultsuffixdroppedtextunicodeutf16filename
 msgid "_DroppedUnicodeUTF16text"
-msgstr ""
+msgstr "_删除的Unicode UTF16 文本"
 
 #: ulng.rsdefaultsuffixdroppedtextunicodeutf8filename
 msgid "_DroppedUnicodeUTF8text"
-msgstr ""
+msgstr "_删除的Unicode UTF8 文本"
 
 #: ulng.rsdiffadds
 msgid " Adds: "
 msgstr " 地址："
+
+#: ulng.rsdiffcomparing
+msgid "Comparing..."
+msgstr "比较..."
 
 #: ulng.rsdiffdeletes
 msgid " Deletes: "
@@ -9945,6 +10111,28 @@ msgstr " 匹配："
 #: ulng.rsdiffmodifies
 msgid " Modifies: "
 msgstr " 修改："
+
+#: ulng.rsdifftextdifferenceencoding
+#, fuzzy
+msgctxt "ulng.rsdifftextdifferenceencoding"
+msgid "Encoding"
+msgstr "编码"
+
+#: ulng.rsdifftextdifferencelineending
+msgid "Line-endings"
+msgstr "行尾"
+
+#: ulng.rsdifftextidentical
+msgid "The text is identical, but the following options are used:"
+msgstr "文本是相同的，但使用了以下选项:"
+
+#: ulng.rsdifftextidenticalnotmatch
+msgid ""
+"The text is identical, but the files do not match!\n"
+"The following differences were found:\n"
+msgstr ""
+"文本相同，但文件不匹配!\n"
+"发现以下差异:\n"
 
 #: ulng.rsdlgbuttonabort
 msgid "Ab&ort"
@@ -9964,8 +10152,8 @@ msgid "A&uto-rename source files"
 msgstr "自动重命名源文件(&U)"
 
 #: ulng.rsdlgbuttonautorenametarget
-msgid "A&uto-rename target files"
-msgstr ""
+msgid "Auto-rename tar&get files"
+msgstr "自动重命名目标文件(&U)"
 
 #: ulng.rsdlgbuttoncancel
 msgctxt "ulng.rsdlgbuttoncancel"
@@ -10122,6 +10310,7 @@ msgid "Goto line:"
 msgstr "跳转到行："
 
 #: ulng.rseditgotolinetitle
+msgctxt "ulng.rseditgotolinetitle"
 msgid "Goto Line"
 msgstr "跳转到行"
 
@@ -10195,7 +10384,7 @@ msgstr "否;是"
 
 #: ulng.rsfilenameexportedtcbarprefix
 msgid "Exported_from_DC"
-msgstr ""
+msgstr "从 DC 导出"
 
 #: ulng.rsfileopcopymovefileexistsoptions
 msgid "Ask;Overwrite;Skip"
@@ -10243,15 +10432,15 @@ msgstr "传统 DC .tab 文件"
 
 #: ulng.rsfilterlibraries
 msgid "Library files"
-msgstr ""
+msgstr "库文件"
 
 #: ulng.rsfilterpluginfiles
 msgid "Plugin files"
-msgstr ""
+msgstr "插件文件"
 
 #: ulng.rsfilterprogramslibraries
 msgid "Programs and Libraries"
-msgstr ""
+msgstr "程序和库"
 
 #: ulng.rsfilterstatus
 msgid "FILTER"
@@ -10332,7 +10521,7 @@ msgstr "编辑器字体(&E)"
 
 #: ulng.rsfontusagefunctionbuttons
 msgid "Function Buttons Font"
-msgstr ""
+msgstr "定义按钮字体"
 
 #: ulng.rsfontusagelog
 msgid "&Log Font"
@@ -10348,11 +10537,15 @@ msgstr "路径字体"
 
 #: ulng.rsfontusagesearchresults
 msgid "Search Results Font"
+msgstr "搜索结果字体"
+
+#: ulng.rsfontusagestatusbar
+msgid "Status Bar Font"
 msgstr ""
 
 #: ulng.rsfontusagetreeviewmenu
 msgid "Tree View Menu Font"
-msgstr ""
+msgstr "树视图菜单字体"
 
 #: ulng.rsfontusageviewer
 msgid "&Viewer Font"
@@ -10619,10 +10812,6 @@ msgstr "<默认>"
 msgid "Octal"
 msgstr "八进制"
 
-#: ulng.rsmnucopynetnamestoclip
-msgid "Copy names with UNC path"
-msgstr "使用网络路径复制名称"
-
 #: ulng.rsmnucreateshortcut
 msgid "Create Shortcut..."
 msgstr "创建快捷方式..."
@@ -10650,7 +10839,7 @@ msgstr "映射网络驱动器..."
 
 #: ulng.rsmnumount
 msgid "Mount"
-msgstr "安装"
+msgstr "挂载"
 
 #: ulng.rsmnunew
 msgctxt "ulng.rsmnunew"
@@ -10725,13 +10914,17 @@ msgstr ""
 "\n"
 "是否保留造成损坏的文件？\n"
 
+#: ulng.rsmsgcanceloperation
+msgid "Are you sure that you want to cancel this operation?"
+msgstr ""
+
 #: ulng.rsmsgcannotcopymoveitself
 msgid "You can not copy/move a file \"%s\" to itself!"
 msgstr "您不能将文件 \"%s\" 复制/移动到它自身！"
 
 #: ulng.rsmsgcannotcopyspecialfile
 msgid "Cannot copy special file %s"
-msgstr ""
+msgstr "无法复制特殊文件 %s"
 
 #: ulng.rsmsgcannotdeletedirectory
 msgid "Cannot delete directory %s"
@@ -10851,11 +11044,11 @@ msgstr "无法将文件 %s 复制到 %s"
 
 #: ulng.rsmsgerrcannotmovedirectory
 msgid "Cannot move directory %s"
-msgstr ""
+msgstr "无法移动文件夹 %s"
 
 #: ulng.rsmsgerrcannotmovefile
 msgid "Cannot move file %s"
-msgstr ""
+msgstr "无法移动文件 %s"
 
 #: ulng.rsmsgerrcreatefiledirectoryexists
 msgid "There already exists a directory named \"%s\"."
@@ -10959,7 +11152,7 @@ msgstr "无法设置 \"%s\" 的权限"
 
 #: ulng.rsmsgerrsetxattribute
 msgid "Can not set extended attributes for \"%s\""
-msgstr ""
+msgstr "无法为 \"%s\" 设置扩展属性"
 
 #: ulng.rsmsgerrsmallbuf
 msgid "Buffer too small"
@@ -11003,7 +11196,7 @@ msgstr "成功导出的收藏夹标签数量：%d / %d"
 
 #: ulng.rsmsgfavoritetabsextramode
 msgid "Default extra setting for save dir history for new Favorite Tabs:"
-msgstr "默认额外设置，用于保存新的收藏夹标签的文件夹历史记录："
+msgstr "默认扩展设置，用于保存新的收藏夹标签的文件夹历史记录："
 
 #: ulng.rsmsgfavoritetabsimportedsuccessfully
 msgid "Number of file(s) imported successfully: %d on %d"
@@ -11526,7 +11719,7 @@ msgstr "\"%s\" 已存在。覆盖吗？"
 
 #: ulng.rsmsgpresetconfigdelete
 msgid "Are you sure you want to delete preset \"%s\"?"
-msgstr ""
+msgstr "您确定要删除预设 \"%s\" 吗？"
 
 #: ulng.rsmsgproblemexecutingcommand
 msgid "Problem executing command (%s)"
@@ -11570,7 +11763,7 @@ msgstr "请重启 Double Commander，使修改生效"
 
 #: ulng.rsmsgscriptcantfindlibrary
 msgid "ERROR: Problem loading Lua library file \"%s\""
-msgstr ""
+msgstr "错误：加载 Lua 库文件\"%s\"时出现问题"
 
 #: ulng.rsmsgsekectfiletype
 msgid "Select to which file type to add extension \"%s\""
@@ -11724,9 +11917,17 @@ msgstr ""
 msgid "Enter location and filename where to save a TC Toolbar file"
 msgstr "输入要保存的 TC 工具栏文件的位置和文件名"
 
+#: ulng.rsmsgterminaldisabled
+msgid "Built-in terminal window disabled. Do you want to enable it?"
+msgstr ""
+
 #: ulng.rsmsgterminateprocess
 msgid "WARNING: Terminating a process can cause undesired results including loss of data and system instability. The process will not be given the chance to save its state or data before it is terminated. Are you sure you want to terminate the process?"
 msgstr "警告：终止进程可能会导致意外结果，包括数据丢失和系统不稳定。终止前，该进程将无法保存其状态或数据。您确定要终止该进程吗？"
+
+#: ulng.rsmsgtestarchive
+msgid "Do you want to test selected archives?"
+msgstr "您想测试选定的档案吗"
 
 #: ulng.rsmsgthisisnowinclipboard
 msgid "\"%s\" is now in the clipboard"
@@ -11811,7 +12012,7 @@ msgstr "请输入分卷大小："
 
 #: ulng.rsmsgwanttoconfigurelibrarylocation
 msgid "Do you want to configure Lua library location?"
-msgstr ""
+msgstr "是否要配置 Lua 库位置？"
 
 #: ulng.rsmsgwipefldr
 msgid "Wipe %d selected files/directories?"
@@ -11849,27 +12050,27 @@ msgstr "日期"
 
 #: ulng.rsmulrendefaultpresetname
 msgid "Preset name"
-msgstr ""
+msgstr "预设名称"
 
 #: ulng.rsmulrendefinevariablename
 msgid "Define variable name"
-msgstr ""
+msgstr "定义变量名"
 
 #: ulng.rsmulrendefinevariablevalue
 msgid "Define variable value"
-msgstr ""
+msgstr "定义变量值"
 
 #: ulng.rsmulrenenternameforvar
 msgid "Enter variable name"
-msgstr ""
+msgstr "输入变量名"
 
 #: ulng.rsmulrenentervalueforvar
 msgid "Enter value for variable \"%s\""
-msgstr ""
+msgstr "输入变量 \"%s\" 的值"
 
 #: ulng.rsmulrenexitmodifiedpresetoptions
 msgid "Ignore, just save as the [Last One];Prompt user to confirm if we save it;Save automatically"
-msgstr ""
+msgstr "忽略,只需另存为[最后一个];提示用户确认我们是否保存;自动保存"
 
 #: ulng.rsmulrenextension
 msgctxt "ulng.rsmulrenextension"
@@ -11887,11 +12088,11 @@ msgstr "不修改;大写;小写;首字大写;"
 
 #: ulng.rsmulrenlastpreset
 msgid "[The last used]"
-msgstr ""
+msgstr "[最后使用]"
 
 #: ulng.rsmulrenlaunchbehavioroptions
 msgid "Last masks under [Last One] preset;Last preset;New fresh masks"
-msgstr ""
+msgstr "[最后一个] 预设下的最后一个蒙版;最后预设;新建fresh masks"
 
 #: ulng.rsmulrenlogstart
 msgctxt "ulng.rsmulrenlogstart"
@@ -11908,11 +12109,11 @@ msgstr "从位置 x 到 y 的字符"
 
 #: ulng.rsmulrenmaskcompletedate
 msgid "Complete date"
-msgstr ""
+msgstr "完成日期"
 
 #: ulng.rsmulrenmaskcompletetime
 msgid "Complete time"
-msgstr ""
+msgstr "完成时间"
 
 #: ulng.rsmulrenmaskcounter
 msgctxt "ulng.rsmulrenmaskcounter"
@@ -11942,11 +12143,11 @@ msgstr "扩展名"
 
 #: ulng.rsmulrenmaskfullname
 msgid "Complete filename with path and extension"
-msgstr ""
+msgstr "带路径和扩展名的完整文件名"
 
 #: ulng.rsmulrenmaskfullnamecharatposxtoy
 msgid "Complete filename, char from pos x to y"
-msgstr ""
+msgstr "完整的文件名，从 pos x 到 y 的字符"
 
 #: ulng.rsmulrenmaskguid
 msgid "GUID"
@@ -11991,7 +12192,7 @@ msgstr "名称"
 
 #: ulng.rsmulrenmaskparent
 msgid "Parent folder(s)"
-msgstr ""
+msgstr "父文件夹"
 
 #: ulng.rsmulrenmasksec
 msgid "Second"
@@ -12003,7 +12204,7 @@ msgstr "秒（二位数字）"
 
 #: ulng.rsmulrenmaskvaronthefly
 msgid "Variable on the fly"
-msgstr ""
+msgstr "动态变量"
 
 #: ulng.rsmulrenmaskyear2digits
 msgid "Year (2 digits)"
@@ -12020,25 +12221,27 @@ msgstr "插件"
 
 #: ulng.rsmulrenpromptforsavedpresetname
 msgid "Save preset as"
-msgstr ""
+msgstr "将预设另存为"
 
 #: ulng.rsmulrenpromptnewnameexists
 msgid "Preset name already exists. Overwrite?"
-msgstr ""
+msgstr "预设名称已存在。覆盖吗?"
 
 #: ulng.rsmulrenpromptnewpresetname
 msgid "Enter new preset name"
-msgstr ""
+msgstr "输入新的预设名称"
 
 #: ulng.rsmulrensavemodifiedpreset
 msgid ""
 "\"%s\" preset has been modified.\n"
 "Do you want to save it now?\n"
 msgstr ""
+"\"%s\" 预设已被修改.\n"
+"你想现在保存吗?\n"
 
 #: ulng.rsmulrensortingpresets
 msgid "Sorting presets"
-msgstr ""
+msgstr "排序预设"
 
 #: ulng.rsmulrentime
 msgctxt "ulng.rsmulrentime"
@@ -12644,7 +12847,7 @@ msgstr "常用文件夹列表"
 
 #: ulng.rsoptionseditordirectoryhotlistextra
 msgid "Directory Hotlist Extra"
-msgstr ""
+msgstr "常用文件夹列表扩展"
 
 #: ulng.rsoptionseditordraganddrop
 msgid "Drag & drop"
@@ -12788,11 +12991,11 @@ msgstr "工具栏"
 
 #: ulng.rsoptionseditortoolbarextra
 msgid "Toolbar Extra"
-msgstr ""
+msgstr "工具栏扩展"
 
 #: ulng.rsoptionseditortoolbarmiddle
 msgid "Toolbar Middle"
-msgstr ""
+msgstr "工具栏中间"
 
 #: ulng.rsoptionseditortools
 msgid "Tools"
@@ -12879,7 +13082,7 @@ msgstr "注册为"
 
 #: ulng.rsoptpluginsselectlualibrary
 msgid "Select Lua library file"
-msgstr ""
+msgstr "选择 Lua 库文件"
 
 #: ulng.rsoptrenamingtooltipfiletype
 msgid "Renaming tooltip file type"
@@ -12995,15 +13198,15 @@ msgstr "完整的绝对路径;相对于 %COMMANDER_PATH% 的路径;相对于以�
 
 #: ulng.rspluginsearchcontainscasesenstive
 msgid "contains(case)"
-msgstr ""
+msgstr "包含(大写)"
 
 #: ulng.rspluginsearchcontainsnotcase
 msgid "contains"
-msgstr ""
+msgstr "包含"
 
 #: ulng.rspluginsearchequalcasesensitive
 msgid "=(case)"
-msgstr ""
+msgstr "(大写)"
 
 #: ulng.rspluginsearchequalnotcase
 msgctxt "ulng.rspluginsearchequalnotcase"
@@ -13016,15 +13219,15 @@ msgstr "找不到字段 \"%s\"！"
 
 #: ulng.rspluginsearchnotcontainscasesenstive
 msgid "!contains(case)"
-msgstr ""
+msgstr "不包含(大写)"
 
 #: ulng.rspluginsearchnotcontainsnotcase
 msgid "!contains"
-msgstr ""
+msgstr "不包含"
 
 #: ulng.rspluginsearchnotequacasesensitive
 msgid "!=(case)"
-msgstr ""
+msgstr "非(大写)"
 
 #: ulng.rspluginsearchnotequalnotcase
 msgctxt "ulng.rspluginsearchnotequalnotcase"
@@ -13041,7 +13244,7 @@ msgstr "找不到插件 \"%s\"！"
 
 #: ulng.rspluginsearchregexpr
 msgid "regexp"
-msgstr ""
+msgstr "正则表达式"
 
 #: ulng.rspluginsearchunitnotfoundforfield
 msgctxt "ulng.rspluginsearchunitnotfoundforfield"
@@ -13127,7 +13330,7 @@ msgstr "选择文件夹"
 
 #: ulng.rsselectduplicatemethod
 msgid "Newest;Oldest;Largest;Smallest;First in group;Last in group"
-msgstr ""
+msgstr "最新;最旧;最大;最小;小组第一;小组最后"
 
 #: ulng.rsselectyoufindfileswindow
 msgid "Select your window"
@@ -13199,7 +13402,7 @@ msgstr "真"
 
 #: ulng.rssimplewordvariable
 msgid "Variable"
-msgstr ""
+msgstr "变量"
 
 #: ulng.rssimplewordworkdir
 msgid "WorkDir"
@@ -13459,11 +13662,11 @@ msgstr "将请求用户输入具有默认建议值的参数"
 
 #: ulng.rsvarlastdircurrentpath
 msgid "Last directory of panel's path"
-msgstr ""
+msgstr "面板路径的最后一个目录"
 
 #: ulng.rsvarlastdirofpath
 msgid "Last directory of file's path"
-msgstr ""
+msgstr "文件路径的最后一个目录"
 
 #: ulng.rsvarleftpanel
 msgid "Left panel"
@@ -13594,6 +13797,10 @@ msgctxt "ulng.rsvfsnetwork"
 msgid "Network"
 msgstr "网络"
 
+#: ulng.rsvfsrecyclebin
+msgid "Recycle Bin"
+msgstr "回收站"
+
 #: ulng.rsviewabouttext
 msgid "Internal Viewer of Double Commander."
 msgstr "Double Commander 内部查看器。"
@@ -13639,4 +13846,8 @@ msgstr "替换次数：%d"
 #: ulng.rszeroreplacement
 msgid "No replacement took place."
 msgstr "没有发生替换。"
+
+#: umaincommands.rsfavoritetabs_setupnotexist
+msgid "No setup named \"%s\""
+msgstr "没有名为 \"%s\" 的安装程序"
 

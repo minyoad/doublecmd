@@ -5,16 +5,22 @@ unit uProcessInfo;
 interface
 
 uses
-  Classes, SysUtils, Windows;
+  Classes, SysUtils, JwaWinNT, Windows;
 
 function GetParentProcessId(ProcessId: DWORD): DWORD;
 function GetProcessFileName(hProcess: HANDLE): UnicodeString;
 function GetProcessFileNameEx(ProcessId: DWORD): UnicodeString;
+function GetTokenUserSID(hToken: HANDLE; out SID: TBytes): Boolean;
+function GetProcessUserSID(hProcess: HANDLE; out SID: TBytes): Boolean;
 
 implementation
 
 uses
-  JwaTlHelp32, JwaPsApi;
+  JwaTlHelp32;
+
+var
+  GetProcessImageFileNameW: function(hProcess: HANDLE; lpImageFileName: LPWSTR;
+                                     nSize: DWORD): DWORD; stdcall;
 
 function GetParentProcessId(ProcessId: DWORD): DWORD;
 var
@@ -62,4 +68,34 @@ begin
   end;
 end;
 
+function GetTokenUserSID(hToken: HANDLE; out SID: TBytes): Boolean;
+var
+  ReturnLength: DWORD = 0;
+  TokenInformation: array [0..SECURITY_MAX_SID_SIZE] of Byte;
+  UserToken: TTokenUser absolute TokenInformation;
+begin
+  Result:= GetTokenInformation(hToken, TokenUser, @TokenInformation,
+                               SizeOf(TokenInformation), ReturnLength);
+  if Result then
+  begin
+    SetLength(SID, GetLengthSid(UserToken.User.Sid));
+    CopySid(Length(SID), PSID(@SID[0]), UserToken.User.Sid);
+  end;
+end;
+
+function GetProcessUserSID(hProcess: HANDLE; out SID: TBytes): Boolean;
+var
+  hToken: HANDLE = 0;
+begin
+  Result:= OpenProcessToken(hProcess, TOKEN_QUERY, hToken);
+  if Result then
+  begin
+    Result:= GetTokenUserSID(hToken, SID);
+    CloseHandle(hToken);
+  end;
+end;
+
+initialization
+  Pointer(GetProcessImageFileNameW):= GetProcAddress(GetModuleHandle('psapi.dll'),
+                                                     'GetProcessImageFileNameW');
 end.

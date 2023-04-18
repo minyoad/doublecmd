@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    Some useful functions to work with plugins
 
-   Copyright (C) 2011-2018 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2011-2021 Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -162,6 +162,10 @@ begin
   if I < 0 then
     gWCXPlugins.Add('xz', 91, Folder + 'zip' + PathDelim + 'zip.wcx');
 
+  I:= gWCXPlugins.IndexOfName('zst');
+  if I < 0 then
+    gWCXPlugins.Add('zst', 91, Folder + 'zip' + PathDelim + 'zip.wcx');
+
   I:= gWCXPlugins.IndexOfName('txz');
   if I < 0 then
     gWCXPlugins.Add('txz', 95, Folder + 'zip' + PathDelim + 'zip.wcx');
@@ -278,12 +282,12 @@ begin
   I:= gWCXPlugins.IndexOfName('rar');
   if I < 0 then
     gWCXPlugins.Add('rar', 607, Folder + 'unrar' + PathDelim + 'unrar.wcx')
-  {$IF DEFINED(MSWINDOWS)}
   else
     gWCXPlugins.Flags[I]:= 607;
-  {$ELSE}
-  ;
-  {$ENDIF}
+
+  I:= gWCXPlugins.IndexOfName('base64');
+  if I < 0 then
+    gWCXPlugins.Add('b64', 1, Folder + 'base64' + PathDelim + 'base64.wcx');
 
   // Wdx plugins
   Folder:= '%commander_path%' + PathDelim + 'plugins' + PathDelim + 'wdx' + PathDelim;
@@ -300,7 +304,7 @@ begin
 
   if gWdxPlugins.IndexOfName('audioinfo') < 0 then
   begin
-    gWdxPlugins.Add(GetCmdDirFromEnvVar(Folder) + 'audioinfo' + PathDelim + 'audioinfo.wdx');
+    gWdxPlugins.Add(Folder + 'audioinfo' + PathDelim + 'audioinfo.wdx');
   end;
 
   // Wfx plugins
@@ -318,15 +322,33 @@ begin
   end;
   {$ENDIF}
 
-  {$IF DEFINED(LINUX)}
+  {$IF DEFINED(LINUX) or DEFINED(MSWINDOWS)}
   // Wlx plugins
   Folder:= '%commander_path%' + PathDelim + 'plugins' + PathDelim + 'wlx' + PathDelim;
 
+  {$IF DEFINED(LINUX)}
   I:= gWlxPlugins.IndexOfName('wlxMplayer');
   if I >= 0 then
   begin
     gWlxPlugins.GetWlxModule(I).FileName:= Folder + 'wlxmplayer' + PathDelim + 'wlxmplayer.wlx';
   end;
+  {$ENDIF}
+
+  {$IF DEFINED(MSWINDOWS)}
+  if gWlxPlugins.IndexOfName('richview') < 0 then
+  begin
+    gWlxPlugins.Add(Folder + 'richview' + PathDelim + 'richview.wlx');
+  end;
+  if gWlxPlugins.IndexOfName('preview') < 0 then
+  begin
+    gWlxPlugins.Add(Folder + 'preview' + PathDelim + 'preview.wlx');
+  end;
+  if gWlxPlugins.IndexOfName('wmp') < 0 then
+  begin
+    gWlxPlugins.Add(Folder + 'wmp' + PathDelim + 'wmp.wlx');
+  end;
+  {$ENDIF}
+
   {$ENDIF}
 end;
 

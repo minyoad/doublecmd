@@ -99,6 +99,8 @@ type
     }
     function SetActiveFileNow(aFilePath: String; ScrollTo: Boolean = True; aLastTopRowIndex: PtrInt = -1): Boolean;
 
+    procedure PropertiesRetrieverOnAbort(AStart: Integer; AList: TFPList);
+
   public
     procedure CloneTo(AFileView: TFileView); override;
     procedure SetActiveFile(aFilePath: String); override; overload;
@@ -122,7 +124,7 @@ uses
   LCLProc, LCLType, math, Forms, Graphics,
   DCStrUtils,
   DCOSUtils, 
-  uLng, uGlobs, uMasks, uDCUtils, uIMCode,
+  uLng, uGlobs, uMasks, uDCUtils,
   uFileSourceProperty,
   uPixMapManager,
   uFileViewWorker,
@@ -293,9 +295,11 @@ begin
     if not FUpdatingActiveFile then
     begin
       SetLastActiveFile(NewFileIndex, TopRowIndex);
-      if Assigned(OnChangeActiveFile) then
-        OnChangeActiveFile(Self, FFiles[NewFileIndex].FSFile);
     end;
+
+    if Assigned(OnChangeActiveFile) then
+      OnChangeActiveFile(Self, FFiles[NewFileIndex].FSFile);
+
     if FlatView and (FSelectedCount = 0) then UpdateFlatFileName;
   end;
 end;
@@ -464,7 +468,7 @@ begin
       for i := VisibleFiles.First to VisibleFiles.Last do
       begin
         AFile := FFiles[i];
-        if (AFile.FSFile.Name <> '..') and
+        if (AFile.FSFile.Name <> '..') and (not AFile.Busy) and
            (FileSource.CanRetrieveProperties(AFile.FSFile, AFilePropertiesNeeded) or
            (AFile.TextColor = clNone) or
            (HaveIcons and ((AFile.IconID < 0)
@@ -476,6 +480,7 @@ begin
           if not Assigned(AFileList) then
             AFileList := TFVWorkerFileList.Create;
           AFileList.AddClone(AFile, AFile);
+          AFile.Busy := True;
         end;
       end;
 
@@ -487,6 +492,7 @@ begin
           AFilePropertiesNeeded,
           GetVariantFileProperties,
           @PropertiesRetrieverOnUpdate,
+          @PropertiesRetrieverOnAbort,
           AFileList);
 
         AddWorker(Worker, False);
@@ -615,6 +621,7 @@ var
   sFileName : String;
   AFile: TFile;
   Masks: TMaskList;
+  AOptions: TMaskOptions = [moPinyin];
 
   function NextIndexWrap(Index: PtrInt): PtrInt;
   begin
@@ -663,7 +670,10 @@ begin
 
   StopIndex := Index;
   try
-    Masks:= TMaskList.Create(SearchTerm, ';,', SearchOptions.SearchCase = qscSensitive);
+    if (SearchOptions.SearchCase = qscSensitive) then
+      AOptions += [moCaseSensitive];
+
+    Masks:= TMaskList.Create(SearchTerm, ';,', AOptions);
 
     for I := 0 to Masks.Count - 1 do
     begin
@@ -690,7 +700,7 @@ begin
         sFileName := AFile.Name;
 
         // Match the file name and Pinyin letter
-        if not (Masks.Matches(sFileName) or (Masks.Matches(MakeSpellCode(sFileName)))) then
+        if not (Masks.Matches(sFileName)) then
           Result := False;
 
         if Result then
@@ -859,6 +869,7 @@ function TOrderedFileView.SetActiveFileNow(aFilePath: String;
   end;
 
 var
+  APath: String;
   Index: PtrInt;
   PathIsAbsolute: Boolean;
 begin
@@ -879,7 +890,12 @@ begin
     end;
     if (FLastActiveFileIndex > -1) then
     begin
-      if FlatView or IsInPath(CurrentPath, LastActiveFile, False, False) then
+      if (StrBegins(LastActiveFile, CurrentAddress)) then
+        APath:= CurrentLocation
+      else begin
+        APath:= CurrentPath;
+      end;
+      if FlatView or IsInPath(APath, LastActiveFile, False, False) then
       begin
         if (PathIsAbsolute and mbCompareFileNames(LastActiveFile, aFilePath)) or
            (FlatView) or (mbCompareFileNames(LastActiveFile, CurrentPath + aFilePath)) then
@@ -896,6 +912,18 @@ begin
     end;
   end;
   Result := False;
+end;
+
+procedure TOrderedFileView.PropertiesRetrieverOnAbort(AStart: Integer; AList: TFPList);
+var
+  ADisplayFile: TDisplayFile;
+begin
+  while AStart < AList.Count do
+  begin
+    ADisplayFile := TDisplayFile(AList[AStart]);
+    if IsReferenceValid(ADisplayFile) then ADisplayFile.Busy:= False;
+    Inc(AStart);
+  end;
 end;
 
 procedure TOrderedFileView.SetLastActiveFile(FileIndex, TopRowIndex: PtrInt);

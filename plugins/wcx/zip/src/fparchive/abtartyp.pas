@@ -468,20 +468,67 @@ uses
 { ****************** Helper functions Not from Classes Above ***************** }
 function OctalToInt(const Oct : PAnsiChar; aLen : integer): Int64;
 var
+  r : UInt64;
   i : integer;
+  c, sign : Byte;
 begin
   Result := 0;
   if (aLen = 0 ) then
    Exit;
    
   { detect binary number format }
-  if ((Ord(Oct[0]) and $80) <> 0) then begin
-    i := 1;
-    while (i < aLen) do begin
-      Result := (Result * 256) + Ord(Oct[i]);
-      inc(i);
+  if ((Ord(Oct[0]) and $80) <> 0) then
+  begin
+    c:= Ord(Oct[0]);
+
+    if (c and $40 <> 0) then
+    begin
+      sign := $FF;
+      r := High(UInt64);
+    end
+    else begin
+      r := 0;
+      sign := 0;
+      c := c and $7F;
     end;
-    Exit;
+
+    i:= 1;
+    while (aLen > SizeOf(Int64)) do
+    begin
+      if (c <> sign) then
+      begin
+        if (sign <> 0) then
+          Result:= Low(Int64)
+        else begin
+          Result:= High(Int64);
+        end;
+        Exit;
+      end;
+      c := Ord(Oct[i]);
+      Dec(aLen);
+      Inc(i);
+    end;
+
+    if ((c xor sign) and $80 <> 0) then
+    begin
+      if (sign <> 0) then
+        Result:= Low(Int64)
+      else begin
+        Result:= High(Int64);
+      end;
+      Exit;
+    end;
+
+    while (aLen > 1) do
+    begin
+      r := (r shl 8) or c;
+      c:= Ord(Oct[i]);
+      Dec(aLen);
+      Inc(i);
+    end;
+    r := (r shl 8) or c;
+
+    Exit(Int64(r));
   end;
 
   i := 0;
@@ -1106,6 +1153,11 @@ begin
             begin
               SetString(AValue, P + 1, ALength - 1);
               FTarItem.Size := StrToInt64Def(AValue, FTarItem.Size);
+            end
+            else if (AName = 'mtime') then
+            begin
+              SetString(AValue, P + 1, ALength - 1);
+              FTarItem.ModTime := Round(StrToFloatDef(AValue, FTarItem.ModTime));
             end;
 
             Inc(P, ALength);
@@ -2101,11 +2153,6 @@ begin
 
   if CurItem.ItemType in [UNKNOWN_ITEM] then
     raise EAbTarBadOp.Create; { Unsupported Type, Cannot Extract }
-  if (CurItem.ItemType = UNSUPPORTED_ITEM) and
-     ((Length(CurItem.FileName) >= AB_TAR_NAMESIZE) or
-      (Length(CurItem.LinkName) >= AB_TAR_NAMESIZE)) then
-    raise EAbTarBadOp.Create; { Unsupported Type, Cannot Extract }
-  { We will allow extractions if the file name/Link name are strickly less than 100 chars }
 
   { Link to previously archived file }
   if CurItem.LinkFlag in [AB_TAR_LF_LINK] then
@@ -2169,11 +2216,6 @@ begin
 
   if CurItem.ItemType in [UNKNOWN_ITEM] then
     raise EAbTarBadOp.Create; { Unsupported Type, Cannot Extract }
-  if (CurItem.ItemType = UNSUPPORTED_ITEM) and
-     ((Length(CurItem.FileName) >= AB_TAR_NAMESIZE) or
-      (Length(CurItem.LinkName) >= AB_TAR_NAMESIZE)) then
-    raise EAbTarBadOp.Create; { Unsupported Type, Cannot Extract }
-  { We will allow extractions if the file name is strictly less than 100 chars }
 
   FStream.Position := CurItem.StreamPosition+CurItem.FileHeaderCount*AB_TAR_RECORDSIZE;
   if CurItem.UncompressedSize <> 0 then
@@ -2320,22 +2362,33 @@ var
   OutTarHelp     : TAbTarStreamHelper;
   Abort          : Boolean;
   i              : Integer;
-  NewStream      : TAbVirtualMemoryStream;
+  NewStream      : TStream;
   TempStream     : TStream;
   CurItem        : TAbTarItem;
   AttrEx         : TAbAttrExRec;
+  ATempName      : String;
 begin
   if FArchReadOnly then
     raise EAbTarBadOp.Create; { Archive is read only }
 
   {init new archive stream}
-  NewStream := TAbVirtualMemoryStream.Create;
+  if FOwnsStream and (FStream is TFileStreamEx) then
+  begin
+    if FStream.Size = 0 then
+      NewStream := FStream
+    else begin
+      ATempName := Copy(ExtractOnlyFileName(FArchiveName), 1, MAX_PATH div 2) + '~';
+      ATempName := GetTempName(ExtractFilePath(FArchiveName) + ATempName) + '.tmp';
+      NewStream := TFileStreamEx.Create(ATempName, fmCreate or fmShareDenyWrite);
+    end;
+  end
+  else begin
+    NewStream := TAbVirtualMemoryStream.Create;
+    TAbVirtualMemoryStream(NewStream).SwapFileDirectory := ExtractFileDir(FArchiveName);
+  end;
   OutTarHelp := TAbTarStreamHelper.Create(NewStream);
 
   try {NewStream/OutTarHelp}
-    { create helper }
-    NewStream.SwapFileDirectory := AbGetTempDirectory;
-
     {build new archive from existing archive}
     for i := 0 to pred(Count) do begin
       FCurrentItem := ItemList[i];
@@ -2429,10 +2482,25 @@ begin
       TAbVirtualMemoryStream(FStream).CopyFrom(NewStream, NewStream.Size)
     end
     else begin
-      { need new stream to write }
-      FreeAndNil(FStream);
-      FStream := TFileStreamEx.Create(FArchiveName, fmCreate or fmShareDenyWrite);
-      FStream.CopyFrom(NewStream, NewStream.Size);
+      if FOwnsStream then
+      begin
+        {need new stream to write}
+        if NewStream = FStream then
+          NewStream := nil
+        else begin
+          FreeAndNil(FStream);
+          FreeAndNil(NewStream);
+          if (mbDeleteFile(FArchiveName) and mbRenameFile(ATempName, FArchiveName)) then
+            FStream := TFileStreamEx.Create(FArchiveName, fmOpenReadWrite or fmShareDenyWrite)
+          else
+            RaiseLastOSError;
+        end;
+      end
+      else begin
+        FStream.Size := 0;
+        FStream.Position := 0;
+        FStream.CopyFrom(NewStream, 0)
+      end;
     end;
 
     {update Items list}
@@ -2447,7 +2515,8 @@ begin
     DoArchiveProgress( 100, Abort );
   finally {NewStream/OutTarHelp}
     OutTarHelp.Free;
-    NewStream.Free;
+    if (FStream <> NewStream) then
+      NewStream.Free;
   end;
 end;
 

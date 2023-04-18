@@ -9,7 +9,7 @@
    
    contributors:
    
-   Copyright (C) 2006-2019 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2006-2021 Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License as
@@ -44,12 +44,15 @@ interface
 uses
   Classes, SysUtils, Graphics, syncobjs, uFileSorting, DCStringHashListUtf8,
   uFile, uIconTheme, uDrive, uDisplayFile, uGlobs, uDCReadPSD, uOSUtils
+  {$IF NOT DEFINED(DARWIN)}
+  , uDCReadSVG
+  {$ENDIF}
   {$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
   , fgl
   {$ELSEIF DEFINED(UNIX)}
   , DCFileAttributes
     {$IF NOT DEFINED(DARWIN)}
-    , contnrs, uDCReadSVG, uGio
+    , Contnrs, uGio
       {$IFDEF LCLGTK2}
       , gtk2
       {$ELSE}
@@ -115,6 +118,10 @@ type
     {$IF DEFINED(MSWINDOWS)}
     FSysImgList : THandle;
     FiSysDirIconID : PtrInt;
+    FiEmblemPinned: PtrInt;
+    FiEmblemOnline: PtrInt;
+    FiEmblemOffline: PtrInt;
+    FOneDrivePath: String;
     {$ELSEIF DEFINED(DARWIN)}
     FUseSystemTheme: Boolean;
     {$ELSEIF DEFINED(UNIX)}
@@ -162,6 +169,10 @@ type
        Safe to call without a lock.
     }
     function CheckAddThemePixmap(const AIconName: String; AIconSize: Integer = 0) : PtrInt;
+    {en
+       Loads an icon from the theme
+    }
+    function LoadThemeIcon(AIconTheme: TIconTheme; const AIconName: String; AIconSize: Integer): TBitmap;
     {en
        Loads a theme icon. Returns TBitmap (on GTK2 convert GdkPixbuf to TBitmap).
        This function should only be called under FPixmapLock.
@@ -310,7 +321,7 @@ type
     {$ENDIF}
     function GetIconByName(const AIconName: String): PtrInt;
     function GetThemeIcon(const AIconName: String; AIconSize: Integer) : Graphics.TBitmap;
-    function GetDriveIcon(Drive : PDrive; IconSize : Integer; clBackColor : TColor) : Graphics.TBitmap;
+    function GetDriveIcon(Drive : PDrive; IconSize : Integer; clBackColor : TColor; LoadIcon: Boolean = True) : Graphics.TBitmap;
     function GetDefaultDriveIcon(IconSize : Integer; clBackColor : TColor) : Graphics.TBitmap;
     function GetArchiveIcon(IconSize: Integer; clBackColor : TColor) : Graphics.TBitmap;
     function GetFolderIcon(IconSize: Integer; clBackColor : TColor) : Graphics.TBitmap;
@@ -340,13 +351,13 @@ implementation
 uses
   GraphType, LCLIntf, LCLType, LCLProc, Forms, uGlobsPaths, WcxPlugin,
   DCStrUtils, uDCUtils, uFileSystemFileSource, uReSample, uDebug,
-  DCOSUtils, DCClassesUtf8, LazUTF8, uGraphics, uHash
+  DCOSUtils, DCClassesUtf8, LazUTF8, uGraphics, uHash, uSysFolders
   {$IFDEF LCLGTK2}
     , uPixMapGtk, gdk2pixbuf, gdk2, glib2
   {$ENDIF}
   {$IFDEF MSWINDOWS}
     , CommCtrl, ShellAPI, Windows, DCFileAttributes, uBitmap, uGdiPlus,
-      IntfGraphics, uShlObjAdditional
+      IntfGraphics, DCConvertEncoding, uShlObjAdditional, uShellFolder
   {$ELSE}
     , StrUtils, Types, DCBasicTypes
   {$ENDIF}
@@ -378,84 +389,32 @@ end;
 
 function StretchBitmap(var bmBitmap : Graphics.TBitmap; iIconSize : Integer;
                        clBackColor : TColor; bFreeAtEnd : Boolean = False) : Graphics.TBitmap;
-var
-  memstream: TMemoryStream;
-  {$IFDEF MSWINDOWS}
-  liiSource: TLazIntfImage = nil;
-  liiDestination: TLazIntfImage = nil;
-  ImgFormatDescription:TRawImageDescription;
-  {$ENDIF}
-
 begin
-  {$IFDEF MSWINDOWS}
-  //Let's make sure we're working with 32-bits bitmap
-  if bmBitmap.PixelFormat<>pf32bit then
-    begin
-      liiSource:=bmBitmap.CreateIntfImage;
-      liiDestination:=TLazIntfImage.Create(bmBitmap.Width,bmBitmap.Height);
-	  try
-        ImgFormatDescription.Init_BPP32_B8G8R8A8_BIO_TTB(bmBitmap.Width,bmBitmap.Height);
-        liiDestination.DataDescription:=ImgFormatDescription;
-        liiDestination.CopyPixels(liiSource);
-        bmBitmap.FreeImage;
-        bmBitmap.PixelFormat:=pf32bit;
-        bmBitmap.LoadFromIntfImage(liiDestination);
-	  finally
-        liiDestination.Free;
-        liiSource.Free;
-	  end;
-    end;
-  {$ENDIF}
-
   if (iIconSize <> bmBitmap.Height) or (iIconSize <> bmBitmap.Width) then
   begin
     Result := Graphics.TBitMap.Create;
     try
       Result.SetSize(iIconSize, iIconSize);
-      if bmBitmap.RawImage.Description.AlphaPrec <> 0 then // if bitmap has alpha channel
-        Stretch(bmBitmap, Result, ResampleFilters[2].Filter, ResampleFilters[2].Width)
-      else
-        with Result do
-        begin
-          Canvas.Brush.Color := clBackColor;
-          Canvas.FillRect(Canvas.ClipRect);
-          Canvas.StretchDraw(Canvas.ClipRect, bmBitmap);
-          { For drawing color transparent bitmaps }
-          memstream := TMemoryStream.Create;
-          try
-            SaveToStream(memstream);
-            memstream.position := 0;
-            LoadFromStream(memstream);
-          finally
-            memstream.free;
-          end;
-          Transparent := True;
-          if bmBitmap.RawImage.Description.MaskBitsPerPixel = 0 then
-            TransparentColor := clBackColor;
-        end; //  with
-      if bFreeAtEnd then
-        FreeAndNil(bmBitmap);
+      Stretch(bmBitmap, Result, ResampleFilters[2].Filter, ResampleFilters[2].Width);
+      if bFreeAtEnd then FreeAndNil(bmBitmap);
     except
       FreeAndNil(Result);
       raise;
     end;
   end
-  else // Don't need to stretch.
+  // Don't need to stretch.
+  else if bFreeAtEnd then
   begin
-    if bFreeAtEnd then
-    begin
-      Result := bmBitmap;
-      bmBitmap := nil;
-    end
-    else
-    begin
-      Result := Graphics.TBitMap.Create;
-      try
-        Result.Assign(bmBitmap);
-      except
-        FreeAndNil(Result);
-        raise;
-      end;
+    Result := bmBitmap;
+    bmBitmap := nil;
+  end
+  else begin
+    Result := Graphics.TBitMap.Create;
+    try
+      Result.Assign(bmBitmap);
+    except
+      FreeAndNil(Result);
+      raise;
     end;
   end;
 end;
@@ -494,7 +453,7 @@ begin
     try
       Picture.LoadFromFile(AIconFileName);
       //Picture.Graphic.Transparent := True;
-      ABitmap.Assign(Picture.Bitmap);
+      ABitmap.Assign(Picture.Graphic);
 
       // if unsupported BitsPerPixel then exit
       if ABitmap.RawImage.Description.BitsPerPixel > 32 then
@@ -525,9 +484,9 @@ var
   IconFileName: String;
 {$ENDIF}
   AFile: TFile;
+  AIcon: TIcon;
   iIndex : PtrInt;
-  sExtFilter,
-  sGraphicFilter : String;
+  GraphicClass: TGraphicClass;
   bmStandartBitmap : Graphics.TBitMap = nil;
 begin
   Result := nil;
@@ -546,7 +505,7 @@ begin
 {$IFDEF MSWINDOWS}
   if GetIconResourceIndex(sFileName, IconFileName, iIconIndex) then
     begin
-      if ExtractIconExW(PWChar(UTF8Decode(IconFileName)), iIconIndex, phIconLarge, phIconSmall, 1) = 2 then // if extracted both icons
+      if ExtractIconExW(PWChar(CeUtf8ToUtf16(IconFileName)), iIconIndex, phIconLarge, phIconSmall, 1) = 2 then // if extracted both icons
         begin
           // Get system metrics
           iIconSmall:= GetSystemMetrics(SM_CXSMICON);
@@ -559,7 +518,6 @@ begin
           if phIcon <> INVALID_HANDLE_VALUE then
           begin
             bmStandartBitmap := BitmapCreateFromHICON(phIcon);
-            bmStandartBitmap.Masked := True; // Need to explicitly set Masked=True, Lazarus issue #0019747
             if fromWhatItWasLoaded<> nil then fromWhatItWasLoaded^ := fwbwlResourceFileExtracted;
           end;
           DestroyIcon(phIconLarge);
@@ -569,13 +527,32 @@ begin
   else
 {$ENDIF}
     begin
-      sExtFilter := UTF8LowerCase(ExtractFileExt(sFileName)) + ';';
-      sGraphicFilter := GraphicFilter(TGraphic);
       // if file is graphic
-      if (Length(sExtFilter) > 1) and (Pos(sExtFilter, sGraphicFilter) <> 0) and mbFileExists(sFileName) then
+      GraphicClass:= GetGraphicClassForFileExtension(ExtractOnlyFileExt(sFileName));
+      if (GraphicClass <> nil) and mbFileExists(sFileName) then
       begin
-        LoadBitmapFromFile(sFileName, bmStandartBitmap);
-        if fromWhatItWasLoaded<> nil then fromWhatItWasLoaded^ := fwbwlGraphicFile;
+        if (GraphicClass = TIcon) then
+        begin
+          AIcon:= TIcon.Create;
+          try
+            AIcon.LoadFromFile(sFileName);
+            AIcon.Current:= AIcon.GetBestIndexForSize(TSize.Create(iIconSize, iIconSize));
+            bmStandartBitmap:= Graphics.TBitmap.Create;
+            try
+              BitmapAssign(bmStandartBitmap, AIcon);
+            except
+              FreeAndNil(bmStandartBitmap);
+            end;
+          except
+            on E: Exception do
+              DCDebug(Format('Error: Cannot load icon [%s] : %s',[sFileName, E.Message]));
+          end;
+          AIcon.Free;
+        end
+        else begin
+          LoadBitmapFromFile(sFileName, bmStandartBitmap);
+        end;
+        if fromWhatItWasLoaded <> nil then fromWhatItWasLoaded^ := fwbwlGraphicFile;
       end;
     end;
 
@@ -684,16 +661,6 @@ begin
             begin
               // Shrink big bitmaps before putting them into PixmapManager,
               // to speed up later drawing.
-              //
-              // Note: Transparent bitmaps may lose transparency, because
-              // they must drawn onto a background, so we allow smaller bitmaps
-              // up to 48x48 (icons for example) to load in full size and they
-              // are resized upon drawing.
-              //
-              // TODO:
-              // This should resize any non-transparent,
-              // non-alpha channel bitmaps to gIconsSize
-              // (so if Width<>gIconsSize or Height<>gIconsSize then Resize).
               if (bmpBitmap.Width > 48) or (bmpBitmap.Height > 48) then
               begin
                 bmpBitmap := StretchBitmap(bmpBitmap, AIconSize, clBlack, True);
@@ -1060,10 +1027,28 @@ begin
     Result := PtrInt(FThemePixmapsFileNames.List[fileIndex]^.Data);
 end;
 
-function TPixMapManager.LoadIconThemeBitmapLocked(AIconName: String; AIconSize: Integer): Graphics.TBitmap;
+function TPixMapManager.LoadThemeIcon(AIconTheme: TIconTheme; const AIconName: String; AIconSize: Integer): Graphics.TBitmap;
 var
-  sIconFileName: String;
+  FileName: String;
+begin
+  FileName:= AIconTheme.FindIcon(AIconName, AIconSize);
+  if FileName = EmptyStr then Exit(nil);
+{$IF NOT DEFINED(DARWIN)}
+  if TScalableVectorGraphics.IsFileExtensionSupported(ExtractFileExt(FileName)) then
+    Result := BitmapLoadFromScalable(FileName, AIconSize, AIconSize)
+  else
+{$ENDIF}
+  begin
+    Result := CheckLoadPixmapFromFile(FileName);
+    if Assigned(Result) then begin
+      Result:= StretchBitmap(Result, AIconSize, clNone, True);
+    end;
+  end;
+end;
+
+function TPixMapManager.LoadIconThemeBitmapLocked(AIconName: String; AIconSize: Integer): Graphics.TBitmap;
 {$IFDEF LCLGTK2}
+var
   pbPicture: PGdkPixbuf = nil;
 {$ENDIF}
 begin
@@ -1071,33 +1056,21 @@ begin
 
 {$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
   Result := nil;
-  {$IFDEF LCLGTK2}
+  // Try to load icon from system theme
   if gShowIcons > sim_standart then
-    begin
-      pbPicture:= gtk_icon_theme_load_icon(FIconTheme, Pgchar(PChar(AIconName)),
-                                           AIconSize, GTK_ICON_LOOKUP_USE_BUILTIN, nil);
-      if pbPicture <> nil then
-        Result := PixBufToBitmap(pbPicture);
-    end;
-  {$ELSE}
-  sIconFileName:= FIconTheme.FindIcon(AIconName, AIconSize);
-  if sIconFileName <> EmptyStr then
   begin
-    if TScalableVectorGraphics.IsFileExtensionSupported(ExtractFileExt(sIconFileName)) then
-      Result := BitmapLoadFromScalable(sIconFileName, AIconSize, AIconSize)
-    else
-      Result := CheckLoadPixmapFromFile(sIconFileName);
-  end;
+  {$IFDEF LCLGTK2}
+    pbPicture:= gtk_icon_theme_load_icon(FIconTheme, Pgchar(PChar(AIconName)),
+                                         AIconSize, GTK_ICON_LOOKUP_USE_BUILTIN, nil);
+    if pbPicture <> nil then
+      Result := PixBufToBitmap(pbPicture);
+  {$ELSE}
+  Result:= LoadThemeIcon(FIconTheme, AIconName, AIconSize);
   {$ENDIF}
+  end;
   if not Assigned(Result) then
 {$ENDIF}
-    begin
-      sIconFileName:= FDCIconTheme.FindIcon(AIconName, AIconSize);
-      if sIconFileName <> EmptyStr then
-        Result := CheckLoadPixmapFromFile(sIconFileName)
-      else
-        Result := nil;
-    end;
+    Result:= LoadThemeIcon(FDCIconTheme, AIconName, AIconSize);
 end;
 
 function TPixMapManager.GetPluginIcon(const AIconName: String; ADefaultIcon: PtrInt): PtrInt;
@@ -1116,7 +1089,7 @@ begin
     if fileIndex >= 0 then
       Result:= PtrInt(FPixmapsFileNames.List[fileIndex]^.Data)
     else begin
-      if ExtractIconExW(PWChar(UTF8Decode(AIconName)), 0, phIconLarge, phIconSmall, 1) = 0 then
+      if ExtractIconExW(PWChar(CeUtf8ToUtf16(AIconName)), 0, phIconLarge, phIconSmall, 1) = 0 then
         Result:= ADefaultIcon
       else begin
         if not ImageList_GetIconSize(FSysImgList, @AIconSize, @AIconSize) then
@@ -1271,7 +1244,6 @@ begin
     if AIcon <> 0 then
     try
       ABitmap := BitmapCreateFromHICON(AIcon);
-      ABitmap.Masked := True; // Need to explicitly set Masked=True, Lazarus issue #0019747
       if (ABitmap.Width <> gIconsSize) or (ABitmap.Height <> gIconsSize) then
         ABitmap:= StretchBitmap(ABitmap, gIconsSize, clWhite, True);
       Result := FPixmapList.Add(ABitmap);
@@ -1327,27 +1299,16 @@ begin
 end;
 
 function TPixMapManager.GetSystemArchiveIcon: PtrInt;
-const
-  SIID_ZIPFILE = 105;
 var
   psii: TSHStockIconInfo;
-  SHGetStockIconInfo: function(siid: Int32; uFlags: UINT; var psii: TSHStockIconInfo): HRESULT; stdcall;
 begin
-  Result:= -1;
-  if (Win32MajorVersion > 5) then
-  begin
-    Pointer(SHGetStockIconInfo):= GetProcAddress(GetModuleHandle(Shell32), 'SHGetStockIconInfo');
-    if Assigned(SHGetStockIconInfo) then
-    begin
-      psii.cbSize:= SizeOf(TSHStockIconInfo);
-      if SHGetStockIconInfo(SIID_ZIPFILE, SHGFI_SYSICONINDEX, psii) = S_OK then
-      begin
-        Result:= psii.iSysImageIndex + SystemIconIndexStart;
+  if not SHGetStockIconInfo(SIID_ZIPFILE, SHGFI_SYSICONINDEX, psii) then
+    Result:= -1
+  else begin
+    Result:= psii.iSysImageIndex + SystemIconIndexStart;
 {$IF DEFINED(LCLQT5)}
-        Result := CheckAddSystemIcon(Result);
+    Result := CheckAddSystemIcon(Result);
 {$ENDIF}
-      end;
-    end;
   end;
 end;
 
@@ -1534,6 +1495,13 @@ begin
   FiDefaultIconID:=CheckAddThemePixmap('unknown');
   {$IF DEFINED(MSWINDOWS)}
   FiSysDirIconID := GetSystemFolderIcon;
+  if (Win32MajorVersion >= 10) then
+  begin
+    FiEmblemPinned:= CheckAddThemePixmap('emblem-cloud-pinned', I);
+    FiEmblemOnline:= CheckAddThemePixmap('emblem-cloud-online', I);
+    FiEmblemOffline:= CheckAddThemePixmap('emblem-cloud-offline', I);
+    GetKnownFolderPath(FOLDERID_SkyDrive, FOneDrivePath);
+  end;
   {$ENDIF}
   {$IF DEFINED(MSWINDOWS) or DEFINED(DARWIN)}
   FiDirIconID := -1;
@@ -1696,7 +1664,6 @@ begin
       if AIcon <> 0 then
       try
         Result := BitmapCreateFromHICON(AIcon);
-        Result.Masked := True; // Need to explicitly set Masked=True, Lazarus issue #0019747
       finally
         DestroyIcon(AIcon);
       end
@@ -1841,13 +1808,20 @@ begin
     end
   {$IF DEFINED(MSWINDOWS) OR DEFINED(RabbitVCS)}
   else
-    // Windows XP doesn't draw link overlay icon for soft links (don't know about Vista or 7).
     if DirectAccess then
     begin
       if AFile.IconOverlayID >= SystemIconIndexStart then
         Result:= DrawBitmap(AFile.IconOverlayID
                             {$IFDEF RabbitVCS} - SystemIconIndexStart {$ENDIF},
-                            Canvas, X, Y);
+                            Canvas, X, Y)
+      {$IF DEFINED(MSWINDOWS)}
+      // Special case for OneDrive
+      else if AFile.IconOverlayID > 0 then
+      begin
+        I:= gIconsSize div 2;
+        Result:= DrawBitmap(AFile.IconOverlayID, Canvas, X, Y + I, I, I);
+      end;
+      {$ENDIF}
     end;
   {$ENDIF}
     ;
@@ -1903,14 +1877,27 @@ begin
       end;
     end;
 
-    if (DirectAccess = False) and (AFile.Attributes = (FILE_ATTRIBUTE_NORMAL or FILE_ATTRIBUTE_VIRTUAL)) and Assigned(AFile.LinkProperty) then
+    if (DirectAccess = False) then
     begin
-      if not LoadIcon then
-        Result := -1
-      else begin
-        Result := GetPluginIcon(AFile.LinkProperty.LinkTo, FiDirIconID);
+      if (AFile.Attributes = (FILE_ATTRIBUTE_NORMAL or FILE_ATTRIBUTE_VIRTUAL)) and Assigned(AFile.LinkProperty) then
+      begin
+        if not LoadIcon then
+          Result := -1
+        else begin
+          Result := GetPluginIcon(AFile.LinkProperty.LinkTo, FiDirIconID);
+        end;
+        Exit;
+      end
+      else if (AFile.Attributes = (FILE_ATTRIBUTE_OFFLINE or FILE_ATTRIBUTE_VIRTUAL)) and Assigned(AFile.LinkProperty) then
+      begin
+        if not LoadIcon then
+          Result := -1
+        else begin
+          Result := CheckAddPixmap(AFile.LinkProperty.LinkTo);
+          if Result < 0 then Result := FiDirIconID;
+        end;
+        Exit;
       end;
-      Exit;
     end;
 
     if IsDirectory or IsLinkToDirectory then
@@ -2064,7 +2051,7 @@ begin
         sFileName := Name;
       end;
 
-    if (SHGetFileInfoW(PWideChar(UTF8Decode(sFileName)),
+    if (SHGetFileInfoW(PWideChar(CeUtf8ToUtf16(sFileName)),
                        dwFileAttributes,
                        FileInfo,
                        SizeOf(FileInfo),
@@ -2118,10 +2105,34 @@ end;
 {$IF DEFINED(MSWINDOWS)}
 function TPixMapManager.GetIconOverlayByFile(AFile: TFile; DirectAccess: Boolean): PtrInt;
 begin
-  if DirectAccess then
-    Result:= SHGetOverlayIconIndex(AFile.Path, AFile.Name) + SystemIconIndexStart
+  if not DirectAccess then Exit(-1);
+  Result:= SHGetOverlayIconIndex(AFile.Path, AFile.Name);
+  if Result >= 0 then begin
+    Result += SystemIconIndexStart;
+  end
+  // Special case for OneDrive
+  else if (Win32MajorVersion >= 10) and IsInPath(FOneDrivePath, AFile.Path, True, True) then
+  begin
+    if AFile.Attributes and FILE_ATTRIBUTE_PINNED <> 0 then
+      Result:= FiEmblemPinned
+    else if AFile.Attributes and FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS <> 0 then
+      Result:= FiEmblemOnline
+    else begin
+      Result:= SHGetStorePropertyValue(AFile.FullPath, PKEY_StorageProviderState);
+      case Result of
+        1:
+          Result:= FiEmblemOnline;
+        2:
+          Result:= FiEmblemOffline;
+        3:
+          Result:= FiEmblemPinned;
+        else
+          Result:= 0;
+      end;
+    end;
+  end
   else
-    Result:= -1;
+    Result:= 0;
 end;
 {$ELSEIF DEFINED(RabbitVCS)}
 function TPixMapManager.GetIconOverlayByFile(AFile: TFile; DirectAccess: Boolean): PtrInt;
@@ -2162,13 +2173,14 @@ begin
   end;
 end;
 
-function TPixMapManager.GetDriveIcon(Drive : PDrive; IconSize : Integer; clBackColor : TColor) : Graphics.TBitmap;
+function TPixMapManager.GetDriveIcon(Drive : PDrive; IconSize : Integer; clBackColor : TColor; LoadIcon: Boolean) : Graphics.TBitmap;
 {$IFDEF MSWINDOWS}
 var
   SFI: TSHFileInfoW;
   uFlags: UINT;
   iIconSmall,
   iIconLarge: Integer;
+  psii: TSHStockIconInfo;
 {$ENDIF}
 begin
   if Drive^.DriveType = dtVirtual then
@@ -2181,8 +2193,13 @@ begin
   if ScreenInfo.ColorDepth < 15 then Exit;
   if (not (cimDrive in gCustomIcons)) and (ScreenInfo.ColorDepth > 16) then
     begin
+      if (Win32MajorVersion < 6) and (not LoadIcon) and (Drive^.DriveType = dtNetwork) then
+      begin
+        Result := GetBuiltInDriveIcon(Drive, IconSize, clBackColor);
+        Exit;
+      end;
+
       SFI.hIcon := 0;
-      Result := Graphics.TBitMap.Create;
       iIconLarge:= GetSystemMetrics(SM_CXICON);
       iIconSmall:= GetSystemMetrics(SM_CXSMICON);
 
@@ -2191,19 +2208,21 @@ begin
       else begin
         uFlags := SHGFI_LARGEICON; // Use large icon
       end;
+      uFlags := uFlags or SHGFI_ICON;
 
-      if (SHGetFileInfoW(PWideChar(UTF8Decode(Drive^.Path)), 0, SFI,
-                         SizeOf(SFI), uFlags or SHGFI_ICON) <> 0) then
-      begin
-        if (SFI.hIcon <> 0) then
-        try
-          Result:= BitmapCreateFromHICON(SFI.hIcon);
-          Result.Masked := True; // Need to explicitly set Masked=True, Lazarus issue #0019747
-          if (IconSize <> iIconSmall) and (IconSize <> iIconLarge) then // non standart icon size
-            Result := StretchBitmap(Result, IconSize, clBackColor, True);
-        finally
-          DestroyIcon(SFI.hIcon);
-        end;
+      if (not LoadIcon) and (Drive^.DriveType = dtNetwork) and SHGetStockIconInfo(SIID_DRIVENET, uFlags, psii) then
+        SFI.hIcon:= psii.hIcon
+      else if (SHGetFileInfoW(PWideChar(CeUtf8ToUtf16(Drive^.Path)), 0, SFI, SizeOf(SFI), uFlags) = 0) then begin
+        SFI.hIcon := 0;
+      end;
+
+      if (SFI.hIcon <> 0) then
+      try
+        Result:= BitmapCreateFromHICON(SFI.hIcon);
+        if (IconSize <> iIconSmall) and (IconSize <> iIconLarge) then // non standart icon size
+          Result := StretchBitmap(Result, IconSize, clBackColor, True);
+      finally
+        DestroyIcon(SFI.hIcon);
       end;
     end // not gCustomDriveIcons
   else
@@ -2262,28 +2281,39 @@ end;
 procedure TPixMapManager.LoadApplicationThemeIcon;
 var
   AIcon: TIcon;
-  SmallIcon, LargeIcon: Graphics.TBitmap;
+  LargeIcon: Graphics.TBitmap;
+  SmallSize, LargeSize: Integer;
+  SmallIcon: Graphics.TBitmap = nil;
 begin
-  LargeIcon:= LoadIconThemeBitmapLocked('doublecmd', GetSystemMetrics(SM_CXICON));
-  SmallIcon:= LoadIconThemeBitmapLocked('doublecmd', GetSystemMetrics(SM_CXSMICON));
+  LargeSize:= GetSystemMetrics(SM_CXICON);
+  SmallSize:= GetSystemMetrics(SM_CXSMICON);
+  LargeIcon:= LoadIconThemeBitmapLocked('doublecmd', LargeSize);
+  if (LargeSize <> SmallSize) then begin
+    SmallIcon:= LoadIconThemeBitmapLocked('doublecmd', SmallSize);
+  end;
   if Assigned(LargeIcon) or Assigned(SmallIcon) then
-  begin
+  try
     AIcon:= TIcon.Create;
-    if Assigned(SmallIcon) then
-    begin
-      AIcon.Add(pf32bit, SmallIcon.Height, SmallIcon.Width);
-      AIcon.AssignImage(SmallIcon);
-      SmallIcon.Free;
+    try
+      if Assigned(SmallIcon) then
+      begin
+        AIcon.Add(pf32bit, SmallIcon.Height, SmallIcon.Width);
+        AIcon.AssignImage(SmallIcon);
+        SmallIcon.Free;
+      end;
+      if Assigned(LargeIcon) then
+      begin
+        AIcon.Add(pf32bit, LargeIcon.Height, LargeIcon.Width);
+        if AIcon.Count > 1 then AIcon.Current:= AIcon.Current + 1;
+        AIcon.AssignImage(LargeIcon);
+        LargeIcon.Free;
+      end;
+      Application.Icon.Assign(AIcon);
+    finally
+      AIcon.Free;
     end;
-    if Assigned(LargeIcon) then
-    begin
-      AIcon.Add(pf32bit, LargeIcon.Height, LargeIcon.Width);
-      AIcon.Current := AIcon.Current + 1;
-      AIcon.AssignImage(LargeIcon);
-      LargeIcon.Free;
-    end;
-    Application.Icon.Assign(AIcon);
-    AIcon.Free;
+  except
+    // Skip
   end;
 end;
 

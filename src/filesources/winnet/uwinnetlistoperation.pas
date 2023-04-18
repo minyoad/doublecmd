@@ -33,11 +33,17 @@ implementation
 uses
   LazUTF8, uFile, Windows, JwaWinNetWk, JwaLmCons, JwaLmShare, JwaLmApiBuf,
   StrUtils, DCStrUtils, uShowMsg, DCOSUtils, uOSUtils, uNetworkThread, uMyWindows,
-  ShlObj, ComObj, uShellFolder, uShlObjAdditional;
+  ShlObj, ComObj, DCConvertEncoding, uShellFolder, uShlObjAdditional;
 
 function TWinNetListOperation.Linux: Boolean;
+var
+  APath: String;
 begin
-  Result:= CheckWin32Version(10) and StrBegins(Path, '\\wsl$\');
+  Result:= CheckWin32Version(10);
+  if Result then begin
+    APath:= LowerCase(Path);
+    Result:= StrBegins(APath, '\\wsl$\') or StrBegins(APath, '\\wsl.localhost\');
+  end;
 end;
 
 function TWinNetListOperation.Connect: Boolean;
@@ -52,11 +58,11 @@ begin
     AbortMethod:= @CheckOperationState;
   end;
   if FWinNetFileSource.IsNetworkPath(Path) then
-    ServerPath:= UTF8Decode(ExcludeTrailingPathDelimiter(Path))
+    ServerPath:= CeUtf8ToUtf16(ExcludeTrailingPathDelimiter(Path))
   else begin
     dwResult:= NPos(PathDelim, Path, 4);
     if dwResult = 0 then dwResult:= MaxInt;
-    ServerPath:= UTF8Decode(Copy(Path, 1, dwResult - 1));
+    ServerPath:= CeUtf8ToUtf16(Copy(Path, 1, dwResult - 1));
   end;
   dwResult:= TNetworkThread.Connect(nil, PWideChar(ServerPath), RESOURCETYPE_ANY, AbortMethod);
   if dwResult <> NO_ERROR then
@@ -91,7 +97,7 @@ begin
     if not IsPathAtRoot(Path) then
     begin
       FilePath:= ExcludeTrailingPathDelimiter(Path);
-      FileName:= UTF8Decode(ExcludeFrontPathDelimiter(FilePath));
+      FileName:= CeUtf8ToUtf16(ExcludeFrontPathDelimiter(FilePath));
       nFile.lpRemoteName:= PWideChar(FileName);
     end;
 
@@ -141,7 +147,7 @@ var
 begin
   if not Connect then Exit;
 
-  ServerPath:= UTF8Decode(ExcludeTrailingPathDelimiter(Path));
+  ServerPath:= CeUtf8ToUtf16(ExcludeTrailingPathDelimiter(Path));
 
   BufPtr:= nil;
   repeat

@@ -39,6 +39,8 @@ type
 
   TFileViewClass = class of TFileView;
 
+  TChangePathReason = (cprAdd, cprRemove, cprChange);
+
   {en
      Called before path is changed. If it returns @true the paths is changed
      (and if successful, OnAfterChangePath is called). If it returns @false,
@@ -47,6 +49,7 @@ type
   }
   TOnBeforeChangePath = function (FileView: TFileView;
                                   NewFileSource: IFileSource;
+                                  Reason: TChangePathReason;
                                   const NewPath : String): Boolean of object;
   TOnAfterChangePath = procedure (FileView: TFileView) of object;
   TOnChangeActiveFile = procedure (FileView: TFileView; const aFile : TFile) of object;
@@ -238,6 +241,7 @@ type
     procedure CalculateSpaceOnUpdate(const UpdatedFile: TDisplayFile;
                                      const UserData: Pointer);
     procedure CancelLastPathChange;
+    procedure ReleaseBusy;
     procedure ClearFiles;
     {en
        Called when display file list (filtered list) has changed.
@@ -323,7 +327,7 @@ type
        Called before changing path. If returns @false the path is not changed.
        NewFileSource is @nil if the last file source is to be removed.
     }
-    function BeforeChangePath(NewFileSource: IFileSource; NewPath: String): Boolean; virtual;
+    function BeforeChangePath(NewFileSource: IFileSource; Reason: TChangePathReason; NewPath: String): Boolean; virtual;
     {en
        Called after path is changed.
     }
@@ -375,8 +379,8 @@ type
     function Clone({%H-}NewParent: TWinControl): TFileView; virtual;
     procedure CloneTo(AFileView: TFileView); virtual;
 
-    procedure AddFileSource(aFileSource: IFileSource; aPath: String); virtual;
-    procedure RemoveCurrentFileSource; virtual;
+    function AddFileSource(aFileSource: IFileSource; aPath: String): Boolean; virtual;
+    function RemoveCurrentFileSource: Boolean; virtual;
     procedure RemoveAllFileSources; virtual;
     {en
        Assigns the list of file sources and paths into those file sources
@@ -1049,6 +1053,7 @@ begin
       on EFileSourceException do
         begin
           FreeAndNil(AFile);
+          Reload(APath);
           Exit;
         end;
     end;
@@ -1105,6 +1110,7 @@ begin
       ADisplayFile.FSFile.Name := NewFileName;
       FHashedNames.Remove(OldFileName);
       FHashedNames.Add(NewFileName, ADisplayFile);
+      ADisplayFile.Busy:= False;
       ADisplayFile.IconID := -1;
       ADisplayFile.Selected := False;
       ADisplayFile.IconOverlayID := -1;
@@ -1241,6 +1247,7 @@ begin
           Exit;
         end;
     end;
+    ADisplayFile.Busy := False;
     ADisplayFile.TextColor := clNone;
     ADisplayFile.IconOverlayID := -1;
     ADisplayFile.DisplayStrings.Clear;
@@ -1455,6 +1462,14 @@ begin
     ClearFiles;
 end;
 
+procedure TFileView.ReleaseBusy;
+var
+  Index: Integer;
+begin
+  for Index := 0 to FFiles.Count - 1 do
+    FFiles[Index].Busy:= False;
+end;
+
 procedure TFileView.DoOnFileListChanged;
 begin
   if Assigned(OnFileListChanged) then
@@ -1485,7 +1500,7 @@ end;
 
 procedure TFileView.SetCurrentPath(NewPath: String);
 begin
-  if (NewPath <> CurrentPath) and BeforeChangePath(FileSource, NewPath) then
+  if (NewPath <> CurrentPath) and BeforeChangePath(FileSource, cprChange, NewPath) then
   begin
     FFlatView:= False;
     EnableWatcher(False);
@@ -1765,6 +1780,7 @@ var
   bSelected: Boolean = False;
   bCaseSensitive, bIgnoreAccents, bWindowsInterpretation: boolean;
   LocalMarkFileChecks: TFindFileChecks;
+  AOptions: TMaskOptions = [];
 begin
   BeginUpdate;
   try
@@ -1789,7 +1805,11 @@ begin
       if pbWindowsInterpretation <> nil then bWindowsInterpretation := pbWindowsInterpretation^ else bWindowsInterpretation := gMarkMaskFilterWindows;
       if pMarkFileChecks<> nil then LocalMarkFileChecks:=pMarkFileChecks^ else LocalMarkFileChecks.Attributes:=nil;
 
-      MaskList := TMaskList.Create(sMask, ';,', bCaseSensitive, bIgnoreAccents, bWindowsInterpretation);
+      if bCaseSensitive then AOptions+= [moCaseSensitive];
+      if bIgnoreAccents then AOptions+= [moIgnoreAccents];
+      if bWindowsInterpretation then AOptions+= [moWindowsMask];
+
+      MaskList := TMaskList.Create(sMask, ';,', AOptions);
       for I := 0 to FFiles.Count - 1 do
       begin
         if FFiles[I].FSFile.Name = '..' then Continue;
@@ -1941,6 +1961,8 @@ begin
     OrigDisplayFile.TextColor := UpdatedFile.TextColor;
 
   DoFileUpdated(OrigDisplayFile);
+
+  OrigDisplayFile.Busy:= False;
 end;
 
 function TFileView.GetActiveFileName: String;
@@ -2598,13 +2620,20 @@ begin
     if Assigned(APage) and (APage.LockState <> tlsNormal) then
     begin
       if not mbCompareFileNames(FHistory.CurrentPath, APage.LockPath) then
+      begin
+        FileSourceClass:= gVfsModuleList.GetFileSource(APage.LockPath);
+        if Assigned(FileSourceClass) then aFileSource := FileSourceClass.Create;
         FHistory.Add(aFileSource, APage.LockPath);
+      end;
     end;
-    // Go to upper directory if current doesn't exist
-    sPath := GetDeepestExistingPath(FHistory.CurrentPath);
-    if Length(sPath) = 0 then sPath := mbGetCurrentDir;
-    if not mbCompareFileNames(sPath, FHistory.CurrentPath) then
-      FHistory.Add(aFileSource, sPath);
+    if TFileSystemFileSource.ClassNameIs(aFileSource.ClassName) then
+    begin
+      // Go to upper directory if current doesn't exist
+      sPath := GetDeepestExistingPath(FHistory.CurrentPath);
+      if Length(sPath) = 0 then sPath := mbGetCurrentDir;
+      if not mbCompareFileNames(sPath, FHistory.CurrentPath) then
+        FHistory.Add(aFileSource, sPath);
+    end;
   end;
 
   if Assigned(aFileSource) then
@@ -2787,12 +2816,13 @@ begin
   UpdateTitle;
 end;
 
-function TFileView.BeforeChangePath(NewFileSource: IFileSource; NewPath: String): Boolean;
+function TFileView.BeforeChangePath(NewFileSource: IFileSource;
+  Reason: TChangePathReason; NewPath: String): Boolean;
 begin
   if NewPath <> '' then
   begin
     if Assigned(OnBeforeChangePath) then
-      if not OnBeforeChangePath(Self, NewFileSource, NewPath) then
+      if not OnBeforeChangePath(Self, NewFileSource, Reason, NewPath) then
         Exit(False);
 
     if Assigned(NewFileSource) and not NewFileSource.SetCurrentWorkingDirectory(NewPath) then
@@ -2873,13 +2903,14 @@ begin
   FMethods.ExecuteCommand(CommandName, Params);
 end;
 
-procedure TFileView.AddFileSource(aFileSource: IFileSource; aPath: String);
+function TFileView.AddFileSource(aFileSource: IFileSource; aPath: String): Boolean;
 var
   IsNewFileSource: Boolean;
 begin
   IsNewFileSource := not aFileSource.Equals(FileSource);
 
-  if BeforeChangePath(aFileSource, aPath) then
+  Result:= BeforeChangePath(aFileSource, cprAdd, aPath);
+  if Result then
   begin
     FFlatView := False;
 
@@ -2906,7 +2937,7 @@ begin
   end;
 end;
 
-procedure TFileView.RemoveCurrentFileSource;
+function TFileView.RemoveCurrentFileSource: Boolean;
 var
   NewFileSource: IFileSource = nil;
   NewPath: String = '';
@@ -2914,6 +2945,7 @@ var
   PrevIndex: Integer;
   FocusedFile: String;
 begin
+  Result:= True;
   if FileSourcesCount > 0 then
   begin
     FFlatView := False;
@@ -2933,8 +2965,8 @@ begin
       begin
         NewFileSource := FHistory.FileSource[PrevIndex];
         NewPath := FHistory.Path[PrevIndex, FHistory.PathsCount[PrevIndex] - 1];
-
-        if BeforeChangePath(NewFileSource, NewPath) then
+        Result:= BeforeChangePath(NewFileSource, cprRemove, NewPath);
+        if Result then
         begin
           IsNewFileSource := not NewFileSource.Equals(FileSource);
 
@@ -3091,6 +3123,7 @@ begin
       else if fvnDisplayFileListChanged in FNotifications then
       begin
         FNotifications := FNotifications - [fvnDisplayFileListChanged];
+        ReleaseBusy;
         DisplayFileListChanged;
         StartRecentlyUpdatedTimerIfNeeded;
       end
@@ -3271,6 +3304,8 @@ begin
       Self.RemoveFile(EventData.FileName);
     fswFileRenamed:
       Self.RenameFile(EventData.NewFileName, EventData.FileName, EventData.Path, NewFilesPosition, UpdatedFilesPosition);
+    fswSelfDeleted:
+      CurrentPath:= GetDeepestExistingPath(CurrentPath);
     else
       Reload(EventData.Path);
   end;
@@ -3376,7 +3411,7 @@ begin
 
   IsNewFileSource := not FHistory.FileSource[aFileSourceIndex].Equals(FHistory.CurrentFileSource);
 
-  if BeforeChangePath(FHistory.FileSource[aFileSourceIndex],
+  if BeforeChangePath(FHistory.FileSource[aFileSourceIndex], cprChange,
                       FHistory.Path[aFileSourceIndex, aPathIndex]) then
   begin
     FFlatView := False;

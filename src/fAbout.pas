@@ -45,7 +45,6 @@ type
     pnlText: TPanel;
     memInfo: TMemo;
     pnlInfo: TPanel;
-    pnlLogo: TPanel;
     procedure btnCopyToClipboardClick(Sender: TObject);
     procedure lblHomePageAddressClick(Sender: TObject);
     procedure lblHomePageAddressMouseEnter(Sender: TObject);
@@ -162,7 +161,7 @@ begin
                     'Platform: %s' + LineEnding +
                     'OS version: %s' + LineEnding,
                     [dcVersion, dcRevision, dcCommit, dcBuildDate,
-                    GetLazarusVersion, fpcVersion,
+                    lazVersion, fpcVersion,
                     TargetCPU + '-' + TargetOS + '-' + TargetWS,
                     OSVersion]);
   if WSVersion <> EmptyStr then
@@ -186,7 +185,7 @@ begin
   lblRevision.Caption        := lblRevision.Caption + #32 + dcRevision;
   lblCommit.Caption          := lblCommit.Caption + #32 + dcCommit;
   lblBuild.Caption           := lblBuild.Caption + #32 + dcBuildDate;
-  lblLazarusVer.Caption      := lblLazarusVer.Caption + #32 + GetLazarusVersion;
+  lblLazarusVer.Caption      := lblLazarusVer.Caption + #32 + lazVersion;
   lblFreePascalVer.Caption   := lblFreePascalVer.Caption + #32 + fpcVersion;
   lblPlatform.Caption        := TargetCPU + '-' + TargetOS + '-' + TargetWS;
   lblOperatingSystem.Caption := OSVersion;

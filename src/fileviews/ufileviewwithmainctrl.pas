@@ -33,8 +33,10 @@ uses
   uFile,
   uFileViewWorker,
   uOrderedFileView,
-  uFileView,  
-  uDragDropEx;
+  uFileView,
+  uDragDropEx,
+  uFileViewNotebook,
+  uDebug;
 
 type
 
@@ -157,6 +159,7 @@ type
     }
     function IsMouseSelecting: Boolean; inline;
     procedure MainControlDblClick(Sender: TObject);
+    procedure DoMainControlFileWork;
     procedure MainControlQuadClick(Sender: TObject);
     procedure MainControlDragDrop(Sender, Source: TObject; X, Y: Integer);
     procedure MainControlDragOver(Sender, Source: TObject; X, Y: Integer; State: TDragState; var Accept: Boolean);
@@ -205,18 +208,6 @@ type
     procedure cm_ContextMenu(const Params: array of string);
   end;
 
-
-// in future this function will moved to DCStrUtils
-{en
-   Return position of first founded tag in string begun from start position
-   @param(T String set of tags)
-   @param(S String)
-   @param(StartPos Start position)
-   @returns(Position of first founded tag in string)
-}
-function TagPos(T:string; const S: string; StartPos: Integer = 1; SearchBackward:boolean=False): Integer;
-
-
 implementation
 
 uses
@@ -224,7 +215,7 @@ uses
   Gtk2Proc,  // for ReleaseMouseCapture
   GTK2Globals,  // for DblClickTime
 {$ENDIF}
-  LCLIntf, LCLProc, LazUTF8, Forms, Dialogs, Buttons, DCOSUtils,
+  LCLIntf, LCLProc, LazUTF8, Forms, Dialogs, Buttons, DCOSUtils, DCStrUtils,
   strutils,
   fMain, uShowMsg, uLng, uFileProperty, uFileSource, uFileSourceOperationTypes,
   uGlobs, uInfoToolTip, uDisplayFile, uFileSystemFileSource, uFileSourceUtil,  
@@ -479,6 +470,27 @@ begin
 end;
 
 procedure TFileViewWithMainCtrl.MainControlDblClick(Sender: TObject);
+{$IFDEF LCLCOCOA}
+// Trigger MouseUp Event if Tab Changed
+var
+  OldTabIndex: Integer;
+  NewTabIndex: Integer;
+begin
+  OldTabIndex := TFileViewPage(NotebookPage).Notebook.ActivePageIndex;
+
+  DoMainControlFileWork();
+
+  NewTabIndex := TFileViewPage(NotebookPage).Notebook.ActivePageIndex;
+  DCDebug( 'TabIndexChanged:'+InttoStr(OldTabIndex)+'-->'+InttoStr(NewTabIndex) );
+  if NewTabIndex<> OldTabIndex then TControl(Sender).Perform(LM_LBUTTONUP,0,0);
+end;
+{$ELSE}
+begin
+  DoMainControlFileWork();
+end;
+{$ENDIF}
+
+procedure TFileViewWithMainCtrl.DoMainControlFileWork;
 var
   Point : TPoint;
   FileIndex : PtrInt;
@@ -1003,13 +1015,13 @@ begin
         with FFiles[FileIndex].FSFile do
         begin
           if (IsDirectory or IsLinkToDirectory) then
-            MainControlDblClick(Sender);
+            DoMainControlFileWork();
         end;
       end
     end
     // A single click starts programs and opens files
     else begin
-      MainControlDblClick(Sender);
+      DoMainControlFileWork();
     end;
   end;
 
@@ -1018,7 +1030,7 @@ end;
 
 procedure TFileViewWithMainCtrl.MainControlQuadClick(Sender: TObject);
 begin
-  MainControlDblClick(Sender);
+  DoMainControlFileWork();
 end;
 
 procedure TFileViewWithMainCtrl.MainControlShowHint(Sender: TObject; HintInfo: PHintInfo);
@@ -1242,6 +1254,9 @@ begin
     end;
     inherited SetFocus;
     MainControl.SetFocus;
+    {$IFDEF LCLCOCOA}
+    Active := true;
+    {$ENDIF}
   end;
 end;
 
@@ -1321,10 +1336,12 @@ end;
 procedure TFileViewWithMainCtrl.tmContextMenuTimer(Sender: TObject);
 var
   AFile: TDisplayFile;
+  Index, Count: Integer;
   ClientPoint, MousePoint: TPoint;
   Background: Boolean;
   FileIndex: PtrInt;
   AtFileList: Boolean;
+  Status: Boolean;
 begin
   FMainControlMouseDown:= False;
   tmContextMenu.Enabled:= False; // stop context menu timer
@@ -1340,8 +1357,29 @@ begin
     if FRenameFileIndex = FileIndex then
       Exit;
 
+    // Restore selection status by default
+    Status := not FMouseSelectionLastState;
+    if (Status = False) then
+    begin
+      Count := 0;
+      for Index := 0 to FFiles.Count - 1 do
+      begin
+        if FFiles[Index].Selected then
+        begin
+          Inc(Count);
+          // If multiple files selected then
+          // select file under cursor too
+          if Count > 1 then
+          begin
+            Status := True;
+            Break;
+          end;
+        end;
+      end;
+    end;
+
     AFile := FFiles[FileIndex];
-    MarkFile(AFile, True, False);
+    MarkFile(AFile, Status, False);
     DoSelectionChanged(FileIndex);
   end;
 
@@ -1694,44 +1732,6 @@ begin
   inherited WorkerStarting(Worker);
   MainControl.Cursor := crHourGlass;
   UpdateInfoPanel; // Update status line only
-end;
-
-function TagPos(T: string; const S: string; StartPos: Integer;
-  SearchBackward: boolean): Integer;
-// in future this function will moved to DCStrUtils
-var
-  i,cnt:integer;
-  ch:char;
-begin
-  Result:=0;
-  i:=StartPos;
-  if i=0 then i:=1;
-
-  cnt:=UTF8Length(S);
-
-  if SearchBackward then
-  begin
-     while (i>0)do
-     begin
-       ch:=S[UTF8CharToByteIndex(PChar(S), length(S), i)];
-       if Pos(ch,T)=0 then
-          dec(i)
-       else
-          break;
-     end;
-  end
-  else
-     while (i<=cnt)do
-     begin
-       ch:=S[UTF8CharToByteIndex(PChar(S), length(S), i)];
-       if Pos(ch,T)=0 then
-          inc(i)
-       else
-          break;
-     end;
-
-
-  Result:=i;
 end;
 
 end.

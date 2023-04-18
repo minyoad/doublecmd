@@ -3,8 +3,8 @@
     -------------------------------------------------------------------------
     This is a thread-component sends an event when a change in the file system occurs.
 
-    Copyright (C) 2009  Koblov Alexander (Alexx2000@mail.ru)
-    Copyright (C) 2011  Przemyslaw Nagay (cobines@gmail.com)
+    Copyright (C) 2009-2021 Alexander Koblov (alexx2000@mail.ru)
+    Copyright (C) 2011      Przemyslaw Nagay (cobines@gmail.com)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,8 +17,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    along with this program. If not, see <http://www.gnu.org/licenses/>.
 }
 
 unit uFileSystemWatcher;
@@ -28,7 +27,7 @@ unit uFileSystemWatcher;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, LCLVersion;
 
 //{$DEFINE DEBUG_WATCHER}
 
@@ -39,6 +38,7 @@ type
                          fswFileChanged,
                          fswFileDeleted,
                          fswFileRenamed,
+                         fswSelfDeleted,
                          fswUnknownChange);
   TFSWatcherEventTypes = set of TFSWatcherEventType;
 
@@ -76,14 +76,20 @@ type
 implementation
 
 uses
-  LCLProc, LazUTF8, uDebug, uExceptions, syncobjs, fgl
+  LCLProc, LazUTF8, LazMethodList, uDebug, uExceptions, syncobjs, fgl
   {$IF DEFINED(MSWINDOWS)}
-  , Windows, JwaWinNT, JwaWinBase, DCWindows, DCStrUtils, uGlobs, DCOSUtils
+  , Windows, JwaWinNT, JwaWinBase, DCWindows, DCStrUtils, uGlobs, DCOSUtils,
+    DCConvertEncoding
   {$ELSEIF DEFINED(LINUX)}
   , inotify, BaseUnix, FileUtil, DCConvertEncoding, DCUnix
   {$ELSEIF DEFINED(BSD)}
   , BSD, Unix, BaseUnix, UnixType, FileUtil, DCOSUtils
   {$ENDIF};
+
+{$if lcl_fullversion < 2030000}
+  {$macro on}
+  {$define SameMethod:= CompareMethods}
+{$endif}
 
 {$IF DEFINED(MSWINDOWS)}
 const
@@ -95,6 +101,13 @@ const
 var
   VAR_READDIRECTORYCHANGESW_BUFFERSIZE: DWORD = READDIRECTORYCHANGESW_BUFFERSIZE;
   CREATEFILEW_SHAREMODE: DWORD = FILE_SHARE_READ or FILE_SHARE_WRITE;
+
+type
+  TOverlappedEx = packed record
+    Overlapped: TOverlapped;
+    OSWatch: Pointer;
+  end;
+  POverlappedEx = ^TOverlappedEx;
 
 function GetTargetPath(const Path: String): String;
 begin
@@ -128,7 +141,7 @@ type
     FWatchFilter: TFSWatchFilter;
     FWatchPath: String;
     {$IF DEFINED(MSWINDOWS)}
-    FOverlapped: OVERLAPPED;
+    FOverlapped: TOverlappedEx;
     FBuffer: PByte;
     FNotifyFilter: DWORD;
     FReferenceCount: LongInt;
@@ -317,7 +330,7 @@ begin
                 gWatcherMode = fswmWholeDrive,
                 Watch.FNotifyFilter,
                 nil,
-                @Watch.FOverlapped,
+                LPOVERLAPPED(@Watch.FOverlapped),
                 @NotifyRoutine)
             or
               // ERROR_IO_PENDING is a confirmation that the I/O operation has started.
@@ -443,7 +456,7 @@ var
   Watch: TOSWatch;
   bReadStarted: Boolean = False;
 begin
-  Watch := TOSWatch(Overlapped^.hEvent);
+  Watch := TOSWatch(POverlappedEx(Overlapped)^.OSWatch);
 
   {$IFDEF DEBUG_WATCHER}
   DCDebug(['FSWatcher: NotifyRoutine for watch ', hexStr(Watch), ' bytes=', dwNumberOfBytes, ' code=', dwErrorCode, ' handle=', Integer(Watch.Handle)]);
@@ -698,6 +711,7 @@ begin
                                      IN_MOVE_SELF)) <> 0 then
                 begin
                   // Watched file/directory was deleted or moved.
+                  EventType := fswSelfDeleted;
                 end
               else begin
                 EventType := fswUnknownChange;
@@ -1026,7 +1040,7 @@ begin
         // Check if the observer is not already registered.
         for j := 0 to OSWatcher.Observers.Count - 1 do
         begin
-          if CompareMethods(TMethod(OSWatcher.Observers[j].WatcherEvent), TMethod(aWatcherEvent)) then
+          if SameMethod(TMethod(OSWatcher.Observers[j].WatcherEvent), TMethod(aWatcherEvent)) then
             Exit(True);
         end;
 
@@ -1124,7 +1138,7 @@ var
 begin
   for j := 0 to FOSWatchers[OSWatcherIndex].Observers.Count - 1 do
   begin
-    if CompareMethods(TMethod(FOSWatchers[OSWatcherIndex].Observers[j].WatcherEvent), TMethod(aWatcherEvent)) then
+    if SameMethod(TMethod(FOSWatchers[OSWatcherIndex].Observers[j].WatcherEvent), TMethod(aWatcherEvent)) then
     begin
       FOSWatchers[OSWatcherIndex].Observers.Delete(j);
 
@@ -1310,7 +1324,7 @@ begin
 
   if FHandle = INVALID_HANDLE_VALUE then
   begin
-    FHandle := CreateFileW(PWideChar(UTF8Decode(FWatchPath)),
+    FHandle := CreateFileW(PWideChar(CeUtf8ToUtf16(FWatchPath)),
                  FILE_LIST_DIRECTORY,
                  CREATEFILEW_SHAREMODE,
                  nil,
@@ -1327,17 +1341,17 @@ begin
   else
   begin
     FillChar(FOverlapped, SizeOf(FOverlapped), 0);
-    // Pass pointer to watcher to the notify routine via hEvent member.
-    FOverlapped.hEvent := Windows.HANDLE(Self);
+    // Pass pointer to watcher to the notify routine
+    FOverlapped.OSWatch := Self;
     QueueRead;
   end;
 end;
 {$ELSEIF DEFINED(LINUX)}
 var
-  hNotifyFilter: cuint32 = 0;
+  hNotifyFilter: cuint32 = IN_DELETE_SELF or IN_MOVE_SELF;
 begin
   if wfFileNameChange in FWatchFilter then
-    hNotifyFilter := hNotifyFilter or IN_CREATE or IN_DELETE or IN_DELETE_SELF or IN_MOVE or IN_MOVE_SELF;
+    hNotifyFilter := hNotifyFilter or IN_CREATE or IN_DELETE or IN_MOVE;
   if wfAttributesChange in FWatchFilter then
     hNotifyFilter := hNotifyFilter or IN_ATTRIB or IN_MODIFY;
 

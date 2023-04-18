@@ -60,7 +60,15 @@ type
     {en
        Set, if the file source cannot be a child
     }
-    fspNoneParent
+    fspNoneParent,
+    {en
+      Set, if the file source has default columns view
+    }
+    fspDefaultView,
+    {en
+       Set, if the file source supports custom context menu.
+    }
+    fspContextMenu
   );
 
   TFileSourceProperties = set of TFileSourceProperty;

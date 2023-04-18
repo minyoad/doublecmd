@@ -42,6 +42,7 @@ type
     constructor Create; override;
 
     class function IsSupportedPath(const Path: String): Boolean; override;
+    class function GetMainIcon(out Path: String): Boolean; override;
 
     function GetParentDir(sPath : String): String; override;
     function IsPathAtRoot(Path: String): Boolean; override;
@@ -86,7 +87,8 @@ implementation
 
 uses
   LazUTF8, uWinNetListOperation, uWinNetExecuteOperation, uMyWindows,
-  Windows, JwaWinNetWk, uVfsModule, uShowMsg, DCOSUtils, DCStrUtils;
+  Windows, JwaWinNetWk, uVfsModule, uShowMsg, DCOSUtils, DCStrUtils,
+  DCConvertEncoding;
 
 function TWinNetFileSource.GetParentDir(sPath: String): String;
 var
@@ -109,7 +111,7 @@ begin
       end;
       Exit;
     end;
-    FilePath:= UTF8Decode(ExcludeTrailingPathDelimiter(sPath));
+    FilePath:= CeUtf8ToUtf16(ExcludeTrailingPathDelimiter(sPath));
     FillByte(nFile, SizeOf(TNetResourceW), 0);
     with nFile do
     begin
@@ -200,6 +202,12 @@ end;
 class function TWinNetFileSource.IsSupportedPath(const Path: String): Boolean;
 begin
   Result:= (Pos('\\', Path) = 1);
+end;
+
+class function TWinNetFileSource.GetMainIcon(out Path: String): Boolean;
+begin
+  Result:= True;
+  Path:= '%SystemRoot%\System32\shell32.dll,17';
 end;
 
 function TWinNetFileSource.CreateListOperation(TargetPath: String): TFileSourceOperation;

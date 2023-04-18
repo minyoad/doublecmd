@@ -45,9 +45,9 @@ implementation
 uses
   DCOSUtils, DCStrUtils,
   {$IF DEFINED(MSWINDOWS)}
-  Windows, ShellApi, uMyWindows
+  Windows, ShellApi, DCConvertEncoding, uMyWindows
   {$ELSEIF DEFINED(UNIX)}
-  BaseUnix, uMyUnix, uOSUtils, FileUtil
+  BaseUnix, uMyUnix, uOSUtils, FileUtil, uSysFolders
     {$IFDEF DARWIN}
     , MacOSAll, DynLibs, CocoaAll, uMyDarwin
     {$ELSE}
@@ -81,7 +81,7 @@ begin
   if StrEnds(FileName, ' ') then
     Exit(False);
 
-  wsFileName:= UTF8Decode(FileName);
+  wsFileName:= CeUtf8ToUtf16(FileName);
   // Windows before Vista cannot move symlink into
   // recycle bin correctly, so we return False in this case
   if (Win32Platform = VER_PLATFORM_WIN32_NT) and (Win32MajorVersion < 6) then
@@ -207,8 +207,11 @@ begin
   // Get user home directory
   sHomeDir:= GetHomeDir;
   // Check if file in home directory
-  if (fpLStat(UTF8ToSys(sHomeDir), st1) >= 0)
+  // If it's a file, stat the parent directory instead for correct behavior on OverlayFS,
+  // it shouldn't make any difference in other cases
+  if (fpStat(UTF8ToSys(sHomeDir), st1) >= 0)
      and (fpLStat(UTF8ToSys(FileName), st2) >= 0)
+     and (fpS_ISDIR(st2.st_mode) or (fpStat(UTF8ToSys(ExtractFileDir(FileName)), st2) >= 0))
      and (st1.st_dev = st2.st_dev) then
   begin
     // Get trash directory in $XDG_DATA_HOME
@@ -277,7 +280,7 @@ begin
   // Windows Vista/Seven
   if (Win32Platform = VER_PLATFORM_WIN32_NT) and (Win32MajorVersion >= 6) then
     begin
-      VolumeName:= GetMountPointVolumeName(UTF8Decode(ExtractFileDrive(sPath)));
+      VolumeName:= GetMountPointVolumeName(CeUtf8ToUtf16(ExtractFileDrive(sPath)));
       VolumeName:= 'Volume' + PathDelim + ExtractVolumeGUID(VolumeName);
       if RegOpenKeyExW(HKEY_CURRENT_USER, PWideChar(wsRoot + VolumeName), 0, KEY_READ, Key) = ERROR_SUCCESS then
         begin
@@ -328,4 +331,3 @@ initialization
 {$ENDIF}
 
 end.
-

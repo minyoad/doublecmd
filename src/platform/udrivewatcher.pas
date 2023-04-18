@@ -61,7 +61,7 @@ uses
   {$ENDIF}
   {$IFDEF MSWINDOWS}
   uMyWindows, Windows, JwaDbt, LazUTF8, JwaWinNetWk, ShlObj, DCOSUtils, uDebug,
-  uShlObjAdditional, JwaNative
+  uShlObjAdditional, JwaNative, uGlobs
   {$ENDIF}
   ;
 
@@ -165,6 +165,10 @@ end;
 const
   WM_USER_MEDIACHANGED = WM_USER + 200;
 
+var
+  SHChangeNotifyRegister: function(hwnd: HWND; fSources: Longint; fEvents: LONG; wMsg: UINT;
+                                   cEntries: Longint; pshcne: PSHChangeNotifyEntry): ULONG; stdcall;
+
 function MyWndProc(hWnd: HWND; uiMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 var
   ADrive: TDrive;
@@ -176,11 +180,17 @@ var
   function GetDrivePath(UnitMask: ULONG): String;
   var
     DriveNum: Byte;
+    DriveLetterOffset: Integer;
   begin
+    if (gUpperCaseDriveLetter) then
+      DriveLetterOffset := Ord('A')
+    else begin
+      DriveLetterOffset := Ord('a')
+    end;
     for DriveNum:= 0 to 25 do
     begin
       if ((UnitMask shr DriveNum) and $01) <> 0 then
-        Exit(AnsiChar(DriveNum + Ord('a')) + ':\');
+        Exit(AnsiChar(DriveNum + DriveLetterOffset) + ':\');
      end;
   end;
 
@@ -221,7 +231,7 @@ begin
           if not SHGetPathFromIDListW(rgpidl^, AName) then
             DoDriveAdded(nil)
           else begin
-            ADrive.Path:= UTF8Encode(UnicodeString(AName));
+            ADrive.Path:= UTF16ToUTF8(UnicodeString(AName));
             DoDriveAdded(@ADrive);
           end;
         end;
@@ -230,7 +240,7 @@ begin
           if not SHGetPathFromIDListW(rgpidl^, AName) then
             DoDriveRemoved(nil)
           else begin
-            ADrive.Path:= UTF8Encode(UnicodeString(AName));
+            ADrive.Path:= UTF16ToUTF8(UnicodeString(AName));
             DoDriveRemoved(@ADrive);
           end;
         end;
@@ -251,11 +261,14 @@ begin
   {$PUSH}{$HINTS OFF}
   OldWProc := WNDPROC(SetWindowLongPtr(Handle, GWL_WNDPROC, LONG_PTR(@MyWndProc)));
   {$POP}
-  if Succeeded(SHGetFolderLocation(Handle, CSIDL_DRIVES, 0, 0, AEntries.pidl)) then
+  if Assigned(SHChangeNotifyRegister) then
   begin
-    AEntries.fRecursive:= False;
-    SHChangeNotifyRegister(Handle, SHCNRF_InterruptLevel or SHCNRF_ShellLevel or SHCNRF_RecursiveInterrupt,
-                           SHCNE_MEDIAINSERTED or SHCNE_MEDIAREMOVED, WM_USER_MEDIACHANGED, 1, @AEntries);
+    if Succeeded(SHGetFolderLocation(Handle, CSIDL_DRIVES, 0, 0, AEntries.pidl)) then
+    begin
+      AEntries.fRecursive:= False;
+      SHChangeNotifyRegister(Handle, SHCNRF_InterruptLevel or SHCNRF_ShellLevel or SHCNRF_RecursiveInterrupt,
+                             SHCNE_MEDIAINSERTED or SHCNE_MEDIAREMOVED, WM_USER_MEDIACHANGED, 1, @AEntries);
+    end;
   end;
 end;
 {$ENDIF}
@@ -507,15 +520,27 @@ var
   DrivePath: String;
   WinDriveType: UINT;
   nFile: TNetResourceW;
+  OptionalColon: String;
   DriveLetter: AnsiChar;
   NetworkPathSize: DWORD;
   lpBuffer: Pointer = nil;
   nFileList: PNetResourceW;
+  DriveLetterOffset: Integer;
   RegDrivePath: UnicodeString;
   dwCount, dwBufferSize: DWORD;
   hEnum: THandle = INVALID_HANDLE_VALUE;
   NetworkPath: array[0..MAX_PATH] of WideChar;
 begin
+  if gUpperCaseDriveLetter then
+    DriveLetterOffset := Ord('A')
+  else begin
+    DriveLetterOffset := Ord('a');
+  end;
+  if gShowColonAfterDrive then
+    OptionalColon := ':'
+  else begin
+    OptionalColon := EmptyStr;
+  end;
   Result := TDrivesList.Create;
   { fill list }
   DriveBits := GetLogicalDrives;
@@ -524,7 +549,7 @@ begin
     if ((DriveBits shr DriveNum) and $1) = 0 then
     begin
       // Try to find in mapped network drives
-      DriveLetter := AnsiChar(DriveNum + Ord('a'));
+      DriveLetter := AnsiChar(DriveNum + DriveLetterOffset);
       RegDrivePath := 'Network' + PathDelim + WideChar(DriveLetter);
       if RegOpenKeyExW(HKEY_CURRENT_USER, PWideChar(RegDrivePath), 0, KEY_READ, Key) = ERROR_SUCCESS then
       begin
@@ -537,7 +562,7 @@ begin
           with Drive^ do
           begin
             Path := DriveLetter + ':\';
-            DisplayName := DriveLetter;
+            DisplayName := DriveLetter + OptionalColon;
             DriveLabel := UTF16ToUTF8(UnicodeString(NetworkPath));
             DriveType := dtNetwork;
             AutoMount := True;
@@ -548,7 +573,7 @@ begin
       Continue;
     end;
 
-    DriveLetter := AnsiChar(DriveNum + Ord('a'));
+    DriveLetter := AnsiChar(DriveNum + DriveLetterOffset);
     DrivePath := DriveLetter + ':\';
     WinDriveType := GetDriveType(PChar(DrivePath));
     if WinDriveType = DRIVE_NO_ROOT_DIR then Continue;
@@ -558,7 +583,7 @@ begin
     begin
       DeviceId := EmptyStr;
       Path := DrivePath;
-      DisplayName := DriveLetter;
+      DisplayName := DriveLetter + OptionalColon;
       DriveLabel := EmptyStr;
       FileSystem := EmptyStr;
       IsMediaAvailable := True;
@@ -692,6 +717,7 @@ end;
          (mnt_type = 'none') or
          (mnt_type = 'cgroup') or
          (mnt_type = 'cpuset') or
+         (mnt_type = 'ramfs') or
          (mnt_type = 'tmpfs') or
          (mnt_type = 'proc') or
          (mnt_type = 'swap') or
@@ -702,6 +728,7 @@ end;
          (mnt_type = 'fusectl') or
          (mnt_type = 'securityfs') or
          (mnt_type = 'binfmt_misc') or
+         (mnt_type = 'fuse.portal') or
          (mnt_type = 'fuse.gvfsd-fuse') or
          (mnt_type = 'fuse.gvfs-fuse-daemon') or
          (mnt_type = 'fuse.truecrypt') or
@@ -1418,5 +1445,10 @@ begin
 end;
 {$ENDIF}
 
+{$IF DEFINED(MSWINDOWS)}
+initialization
+  Pointer(SHChangeNotifyRegister):= GetProcAddress(GetModuleHandle('shell32.dll'),
+                                                   'SHChangeNotifyRegister');
+{$ENDIF}
 end.
 

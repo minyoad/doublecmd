@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    This unit contains Unix specific functions
 
-   Copyright (C) 2015-2021 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2015-2022 Alexander Koblov (alexx2000@mail.ru)
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -48,8 +48,16 @@ const
 
 type
 {$IF DEFINED(LINUX)}
-  TUnixTime = {$IFDEF CPUAARCH64}Int64{$ELSE}UIntPtr{$ENDIF};
-  TUnixMode = Cardinal;
+  TUnixTime =
+    {$IF DEFINED(CPUAARCH64)}
+      Int64
+    {$ELSEIF DEFINED(CPUMIPS)}
+      LongInt
+    {$ELSE}UIntPtr{$ENDIF};
+  TUnixMode =
+    {$IF DEFINED(CPUPOWERPC)}
+      LongInt
+    {$ELSE}Cardinal{$ENDIF};
 {$ELSE}
   TUnixTime = TTime;
   TUnixMode = TMode;
@@ -70,6 +78,37 @@ type
     tm_gmtoff: clong;     //* Seconds east of UTC.
     tm_zone:   pansichar; //* Timezone abbreviation.
   end;
+
+type
+  //en Password file entry record
+  passwd = record
+    pw_name: PChar;    //en< user name
+    pw_passwd: PChar;  //en< user password
+    pw_uid: uid_t;     //en< user ID
+    pw_gid: gid_t;     //en< group ID
+{$IF DEFINED(BSD)}
+    pw_change: time_t; //en< password change time
+    pw_class: PChar;   //en< user access class
+{$ENDIF}
+    pw_gecos: PChar;   //en< real name
+    pw_dir: PChar;     //en< home directory
+    pw_shell: PChar;   //en< shell program
+{$IF DEFINED(BSD)}
+    pw_expire: time_t; //en< account expiration
+    pw_fields: cint;   //en< internal: fields filled in
+{$ENDIF}
+  end;
+  TPasswordRecord = passwd;
+  PPasswordRecord = ^TPasswordRecord;
+  //en Group file entry record
+  group = record
+    gr_name: PChar;   //en< group name
+    gr_passwd: PChar; //en< group password
+    gr_gid: gid_t;    //en< group ID
+    gr_mem: ^PChar;   //en< group members
+  end;
+  TGroupRecord = group;
+  PGroupRecord = ^TGroupRecord;
 
 {en
    Set the close-on-exec flag to all
@@ -106,6 +145,34 @@ function getenv(name: PAnsiChar): PAnsiChar; cdecl; external clib;
             insufficient space in the environment)
 }
 function setenv(const name, value: PAnsiChar; overwrite: cint): cint; cdecl; external clib;
+{en
+   Get password file entry
+   @param(uid User ID)
+   @returns(The function returns a pointer to a structure containing the broken-out
+            fields of the record in the password database that matches the user ID)
+}
+function getpwuid(uid: uid_t): PPasswordRecord; cdecl; external clib;
+{en
+   Get password file entry
+   @param(name User name)
+   @returns(The function returns a pointer to a structure containing the broken-out
+            fields of the record in the password database that matches the user name)
+}
+function getpwnam(const name: PChar): PPasswordRecord; cdecl; external clib;
+{en
+   Get group file entry
+   @param(gid Group ID)
+   @returns(The function returns a pointer to a structure containing the broken-out
+            fields of the record in the group database that matches the group ID)
+}
+function getgrgid(gid: gid_t): PGroupRecord; cdecl; external clib;
+{en
+   Get group file entry
+   @param(name Group name)
+   @returns(The function returns a pointer to a structure containing the broken-out
+            fields of the record in the group database that matches the group name)
+}
+function getgrnam(name: PChar): PGroupRecord; cdecl; external clib;
 
 function FileLock(Handle: System.THandle; Mode: cInt): System.THandle;
 
@@ -114,6 +181,7 @@ function fpLocalTime(timer: PTime; tp: PTimeStruct): PTimeStruct;
 
 {$IF DEFINED(LINUX)}
 function fpFDataSync(fd: cint): cint;
+function fpCloneFile(src_fd, dst_fd: cint): Boolean;
 function fpFAllocate(fd: cint; mode: cint; offset, len: coff_t): cint;
 
 function mbFileGetXattr(const FileName: String): TStringArray;
@@ -136,6 +204,7 @@ type rlim_t = Int64;
 const
   {$IF DEFINED(LINUX)}
   _SC_OPEN_MAX  = 4;
+  FICLONE       = $40049409;
   RLIM_INFINITY = rlim_t(-1);
   {$ELSEIF DEFINED(BSD)}
   _SC_OPEN_MAX  = 5;
@@ -194,6 +263,9 @@ var
   lockop: cint;
   lockres: cint;
   lockerr: cint;
+{$IFDEF LINUX}
+  Sbfs: TStatFS;
+{$ENDIF}
 begin
   Result:= Handle;
   case (Mode and $F0) of
@@ -205,6 +277,16 @@ begin
     else
       Exit;
   end;
+{$IFDEF LINUX}
+  if (fpFStatFS(Handle, @Sbfs) = 0) then
+  begin
+    case UInt32(Sbfs.fstype) of
+      SMB_SUPER_MAGIC,
+      SMB2_MAGIC_NUMBER,
+      CIFS_MAGIC_NUMBER: Exit;
+    end;
+  end;
+{$ENDIF}
   repeat
     lockres:= fpFlock(Handle, lockop);
   until (lockres = 0) or (fpgeterrno <> ESysEIntr);
@@ -238,6 +320,13 @@ function fpFDataSync(fd: cint): cint;
 begin
   Result := fdatasync(fd);
   if Result = -1 then fpseterrno(fpgetCerrno);
+end;
+
+function fpCloneFile(src_fd, dst_fd: cint): Boolean;
+var
+  ASource: Pointer absolute src_fd;
+begin
+  Result:= (FpIOCtl(dst_fd, FICLONE, ASource) = 0);
 end;
 
 function fpFAllocate(fd: cint; mode: cint; offset, len: coff_t): cint;

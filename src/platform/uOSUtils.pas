@@ -3,7 +3,7 @@
     -------------------------------------------------------------------------
     This unit contains platform depended functions.
 
-    Copyright (C) 2006-2019 Alexander Koblov (alexx2000@mail.ru)
+    Copyright (C) 2006-2022 Alexander Koblov (alexx2000@mail.ru)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -65,12 +65,12 @@ const
   RunInTermCloseParams = '';
   MonoSpaceFont = 'Monaco';
   {$ELSE}
-  RunTermCmd = 'xterm';  // default terminal
-  RunTermParams = '';
-  RunInTermStayOpenCmd = 'xterm'; // default run in terminal command AND Stay open after command
-  RunInTermStayOpenParams = '-e sh -c ''{command}; echo -n Press ENTER to exit... ; read a''';
-  RunInTermCloseCmd = 'xterm'; // default run in terminal command AND Close after command
-  RunInTermCloseParams = '-e sh -c {command}';
+  RunTermCmd: String = 'xterm';  // default terminal
+  RunTermParams: String = '';
+  RunInTermStayOpenCmd: String = 'xterm'; // default run in terminal command AND Stay open after command
+  RunInTermStayOpenParams: String = '-e sh -c ''{command}; echo -n Press ENTER to exit... ; read a''';
+  RunInTermCloseCmd: String = 'xterm'; // default run in terminal command AND Close after command
+  RunInTermCloseParams: String = '-e sh -c {command}';
   MonoSpaceFont = 'Monospace';
   {$ENDIF}
   fmtCommandPath = '[%s]$:';
@@ -125,22 +125,7 @@ function GetDiskFreeSpace(const Path : String; out FreeSize, TotalSize : Int64) 
    @returns(The maximum file size for a mounted file system)
 }
 function GetDiskMaxFileSize(const Path : String) : Int64;
-{en
-   Get the user home directory
-   @returns(The user home directory)
-}
-function GetHomeDir : String;
-{en
-   Get the appropriate directory for the application's configuration files
-   @returns(The directory for the application's configuration files)
-}
-function GetAppConfigDir: String;
-{en
-   Get the appropriate directory for the application's cache files
-   @returns(The directory for the application's cache files)
-}
-function GetAppCacheDir: String;
-function GetAppDataDir: String;
+
 function GetTempFolder: String;
 
 { Similar to "GetTempFolder" but that we can unilaterally delete at the end when closin application}
@@ -199,10 +184,10 @@ implementation
 
 uses
   StrUtils, uFileProcs, FileUtil, uDCUtils, DCOSUtils, DCStrUtils, uGlobs, uLng,
-  fConfirmCommandLine, uLog, DCConvertEncoding, LazUTF8
+  fConfirmCommandLine, uLog, DCConvertEncoding, LazUTF8, uSysFolders
   {$IF DEFINED(MSWINDOWS)}
-  , JwaWinCon, Windows, uMyWindows, JwaWinNetWk,
-    uShlObjAdditional, ShlObj, DCWindows, uNetworkThread
+  , Windows, uMyWindows, JwaWinNetWk,
+    uShlObjAdditional, DCWindows, uNetworkThread
   {$ENDIF}
   {$IF DEFINED(UNIX)}
   , BaseUnix, Unix, uMyUnix, dl
@@ -301,9 +286,9 @@ begin
 
   if bFlagKeepGoing then
   begin
-    wFileName:= UTF8Decode(sCmd);
-    wParams:= UTF8Decode(sParams);
-    wStartPath:= UTF8Decode(sStartPath);
+    wFileName:= CeUtf8ToUtf16(sCmd);
+    wParams:= CeUtf8ToUtf16(sParams);
+    wStartPath:= CeUtf8ToUtf16(sStartPath);
 
     if (log_commandlineexecution in gLogOptions) then logWrite(rsMsgLogExtCmdLaunch+': '+rsSimpleWordFilename+'='+sCmd+' / '+rsSimpleWordParameter+'='+sParams+' / '+rsSimpleWordWorkDir+'='+sStartPath);
 
@@ -361,13 +346,13 @@ var
   wsStartPath: UnicodeString;
 begin
   SplitCmdLine(sCmd, sFileName, sParams);
-  wsStartPath:= UTF8Decode(mbGetCurrentDir());
+  wsStartPath:= CeUtf8ToUtf16(mbGetCurrentDir());
   sFileName:= NormalizePathDelimiters(sFileName);
 
   if (log_commandlineexecution in gLogOptions) then
     logWrite(rsMsgLogExtCmdLaunch + ': ' + rsSimpleWordFilename + '=' + sCmd + ' / ' + rsSimpleWordParameter + '=' + sParams);
 
-  ExecutionResult := ShellExecuteW(0, nil, PWideChar(UTF8Decode(sFileName)), PWideChar(UTF8Decode(sParams)), PWideChar(wsStartPath), SW_SHOW);
+  ExecutionResult := ShellExecuteW(0, nil, PWideChar(CeUtf8ToUtf16(sFileName)), PWideChar(CeUtf8ToUtf16(sParams)), PWideChar(wsStartPath), SW_SHOW);
 
   if (log_commandlineexecution in gLogOptions) then
   begin
@@ -386,8 +371,8 @@ var
   wsStartPath: UnicodeString;
 begin
   URL:= NormalizePathDelimiters(URL);
-  wsFileName:= UTF8Decode(QuoteDouble(URL));
-  wsStartPath:= UTF8Decode(mbGetCurrentDir());
+  wsFileName:= CeUtf8ToUtf16(QuoteDouble(URL));
+  wsStartPath:= CeUtf8ToUtf16(mbGetCurrentDir());
   Return:= ShellExecuteW(0, nil, PWideChar(wsFileName), nil, PWideChar(wsStartPath), SW_SHOWNORMAL);
   if Return = SE_ERR_NOASSOC then
     Result:= ExecCmdFork('rundll32 shell32.dll OpenAs_RunDLL ' + URL)
@@ -499,7 +484,7 @@ var
  lpFileSystemFlags: DWORD = 0;
 begin
  Result := High(Int64);
- if GetVolumeInformationW(PWideChar(UTF8Decode(ExtractFileDrive(Path)) + PathDelim),
+ if GetVolumeInformationW(PWideChar(CeUtf8ToUtf16(ExtractFileDrive(Path)) + PathDelim),
                          lpVolumeNameBuffer, SizeOf(lpVolumeNameBuffer),
                          nil,
                          lpMaximumComponentLength,
@@ -522,9 +507,9 @@ var
  lpTargetFileSystem: array [0..MAX_PATH] of WideChar;
 begin
  Result:= False;
- if GetVolumeInformationW(PWideChar(UTF8Decode(ExtractFileDrive(SourceName)) + PathDelim),
+ if GetVolumeInformationW(PWideChar(CeUtf8ToUtf16(ExtractFileDrive(SourceName)) + PathDelim),
                           nil, 0, nil, lpDummy, lpDummy, lpSourceFileSystem, MAX_PATH) and
-    GetVolumeInformationW(PWideChar(UTF8Decode(ExtractFileDrive(TargetName)) + PathDelim),
+    GetVolumeInformationW(PWideChar(CeUtf8ToUtf16(ExtractFileDrive(TargetName)) + PathDelim),
                           nil, 0, nil, lpDummy, lpDummy, lpTargetFileSystem, MAX_PATH) then
   begin
     Result:= (SameText(lpSourceFileSystem, 'FAT32') and SameText(lpTargetFileSystem, 'NTFS')) or
@@ -537,41 +522,10 @@ begin
 end;
 {$ENDIF}
 
-function GetHomeDir : String;
-{$IFDEF MSWINDOWS}
-var
-  iSize: Integer;
-  wHomeDir: UnicodeString;
-begin
-  iSize:= GetEnvironmentVariableW('USERPROFILE', nil, 0);
-  if iSize > 0 then
-    begin
-      SetLength(wHomeDir, iSize);
-      GetEnvironmentVariableW('USERPROFILE', PWChar(wHomeDir), iSize);
-    end;
-  Delete(wHomeDir, iSize, 1);
-  Result:= ExcludeBackPathDelimiter(UTF16ToUTF8(wHomeDir));
-end;
-{$ELSE}
-begin
-  Result:= ExcludeBackPathDelimiter(SysToUTF8(GetEnvironmentVariable('HOME')));
-end;
-{$ENDIF}
-
 function GetShell : String;
 {$IFDEF MSWINDOWS}
-var
-  iSize: Integer;
-  wShell: UnicodeString;
 begin
-  iSize:= GetEnvironmentVariableW('ComSpec', nil, 0);
-  if iSize > 0 then
-    begin
-      SetLength(wShell, iSize);
-      GetEnvironmentVariableW('ComSpec', PWChar(wShell), iSize);
-    end;
-  Delete(wShell, iSize, 1);
-  Result:= UTF16ToUTF8(wShell);
+  Result:= mbGetEnvironmentVariable('ComSpec');
 end;
 {$ELSE}
 begin
@@ -638,92 +592,6 @@ begin
 {$ENDIF}
 end;
 
-function GetAppConfigDir: String;
-{$IF DEFINED(MSWINDOWS)}
-const
-  SHGFP_TYPE_CURRENT = 0;
-var
-  wPath: array[0..MAX_PATH-1] of WideChar;
-  wUser: UnicodeString;
-  dwLength: DWORD;
-begin
-  if SUCCEEDED(SHGetFolderPathW(0, CSIDL_APPDATA or CSIDL_FLAG_CREATE, 0, SHGFP_TYPE_CURRENT, @wPath[0])) or
-     SUCCEEDED(SHGetFolderPathW(0, CSIDL_LOCAL_APPDATA or CSIDL_FLAG_CREATE, 0, SHGFP_TYPE_CURRENT, @wPath[0])) then
-  begin
-    Result := UTF16ToUTF8(WideString(wPath));
-  end
-  else
-  begin
-    dwLength := UNLEN + 1;
-    SetLength(wUser, dwLength);
-    if GetUserNameW(PWideChar(wUser), @dwLength) then
-    begin
-      SetLength(wUser, dwLength - 1);
-      Result := GetTempDir + UTF16ToUTF8(wUser);
-    end
-    else
-      Result := EmptyStr;
-  end;
-  if Result <> '' then
-    Result := Result + DirectorySeparator + ApplicationName;
-end;
-{$ELSEIF DEFINED(DARWIN)}
-begin
-  Result:= GetHomeDir + '/Library/Preferences/' + ApplicationName;
-end;
-{$ELSE}
-var
-  uinfo: PPasswordRecord;
-begin
-  uinfo:= getpwuid(fpGetUID);
-  if (uinfo <> nil) and (uinfo^.pw_dir <> '') then
-    Result:= CeSysToUtf8(uinfo^.pw_dir) + '/.config/' + ApplicationName
-  else
-    Result:= ExcludeTrailingPathDelimiter(SysToUTF8(SysUtils.GetAppConfigDir(False)));
-end;
-{$ENDIF}
-
-function GetAppCacheDir: String;
-{$IF DEFINED(MSWINDOWS)}
-var
-  APath: array[0..MAX_PATH] of WideChar;
-begin
-  if SHGetSpecialFolderPathW(0, APath, CSIDL_LOCAL_APPDATA, True) then
-    Result:= UTF16ToUTF8(UnicodeString(APath)) + DirectorySeparator + ApplicationName
-  else
-    Result:= GetAppConfigDir;
-end;
-{$ELSEIF DEFINED(DARWIN)}
-begin
-  Result:= NSGetFolderPath(NSCachesDirectory);
-end;
-{$ELSE}
-var
-  uinfo: PPasswordRecord;
-begin
-  uinfo:= getpwuid(fpGetUID);
-  if (uinfo <> nil) and (uinfo^.pw_dir <> '') then
-    Result:= CeSysToUtf8(uinfo^.pw_dir) + '/.cache/' + ApplicationName
-  else
-    Result:= GetHomeDir + '/.cache/' + ApplicationName;
-end;
-{$ENDIF}
-
-function GetAppDataDir: String;
-{$IF DEFINED(MSWINDOWS)}
-begin
-  Result:= GetAppCacheDir;
-end;
-{$ELSEIF DEFINED(DARWIN)}
-begin
-  Result:= NSGetFolderPath(NSApplicationSupportDirectory);
-end;
-{$ELSE}
-begin
-  Result:= IncludeTrailingPathDelimiter(GetUserDataDir) + ApplicationName;
-end;
-{$ENDIF}
-
 function GetTempFolder: String;
 begin
   Result:= GetTempDir + '_dc';
@@ -782,8 +650,8 @@ begin
   else if (Drive^.DriveType = dtNetwork) and
      TryMount and (not mbDriveReady(Drv)) then
     begin
-      wsLocalName  := UTF8Decode(ExtractFileDrive(Drive^.Path));
-      wsRemoteName := UTF8Decode(Drive^.DriveLabel);
+      wsLocalName  := CeUtf8ToUtf16(ExtractFileDrive(Drive^.Path));
+      wsRemoteName := CeUtf8ToUtf16(Drive^.DriveLabel);
       TNetworkThread.Connect(PWideChar(wsLocalName), PWideChar(wsRemoteName), RESOURCETYPE_DISK);
     end
   // Try to unlock BitLocker Drive

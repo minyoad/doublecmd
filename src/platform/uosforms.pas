@@ -117,36 +117,43 @@ procedure ShowOpenWithDialog(TheOwner: TComponent; const FileList: TStringList);
 {$ENDIF}
 
 function GetControlHandle(AWindow: TWinControl): HWND;
-function GetWindowHandle(AWindow: TWinControl): HWND;
+function GetWindowHandle(AWindow: TWinControl): HWND; overload;
+function GetWindowHandle(AHandle: HWND): HWND; overload;
+procedure CopyNetNamesToClip;
 
 implementation
 
 uses
   ExtDlgs, LCLProc, Menus, Graphics, InterfaceBase, WSForms, LMessages, LCLIntf,
-  uConnectionManager
+  fMain, uConnectionManager, uShowMsg, uLng
   {$IF DEFINED(MSWINDOWS)}
-  , LCLStrConsts, ComObj, fMain, DCOSUtils, uOSUtils, uFileSystemFileSource
+  , LCLStrConsts, ComObj, DCOSUtils, uOSUtils, uFileSystemFileSource
   , uTotalCommander, FileUtil, Windows, ShlObj, uShlObjAdditional
-  , uWinNetFileSource, uVfsModule, uLng, uMyWindows, DCStrUtils
+  , uWinNetFileSource, uVfsModule, uMyWindows, DCStrUtils
   , uDCReadSVG, uFileSourceUtil, uGdiPlusJPEG, uListGetPreviewBitmap
-  , Dialogs, Clipbrd, uShowMsg, uDebug, JwaDbt, uThumbnailProvider
+  , Dialogs, Clipbrd, uDebug, JwaDbt, uThumbnailProvider
+  , uRecycleBinFileSource, uDCReadHEIF, uDCReadWIC
     {$IFDEF LCLQT5}
     , qt5, qtwidgets, uDarkStyle
     {$ENDIF}
   {$ENDIF}
   {$IFDEF UNIX}
-  , BaseUnix, fFileProperties, uJpegThumb
+  , BaseUnix, Errors, fFileProperties, uJpegThumb, uOpenDocThumb
     {$IF NOT DEFINED(DARWIN)}
     , uDCReadSVG, uMagickWand, uGio, uGioFileSource, uVfsModule, uVideoThumb
-    , uDCReadWebP, uFolderThumb, uAudioThumb
+    , uDCReadWebP, uFolderThumb, uAudioThumb, uDefaultTerminal, uDCReadHEIF
+    , uTrashFileSource
     {$ELSE}
-    , MacOSAll, fMain, uQuickLook, uMyDarwin, uShowMsg, uLng
+    , MacOSAll, uQuickLook, uMyDarwin
     {$ENDIF}
     {$IF NOT DEFINED(DARWIN)}
     , fOpenWith
     {$ENDIF}
     {$IF DEFINED(LCLQT) and not DEFINED(DARWIN)}
     , qt4, qtwidgets
+    {$ENDIF}
+    {$IF DEFINED(LCLQT5) and not DEFINED(DARWIN)}
+    , qt5, qtwidgets
     {$ENDIF}
     {$IF DEFINED(LCLGTK2)}
     , gtk2
@@ -327,7 +334,15 @@ begin
         EnableWindow(FParentWindow, False);
         // If window already created then recreate it to force
         // call CreateParams with appropriate parent window
-        if HandleAllocated then RecreateWnd(Self);
+        if HandleAllocated then
+        begin
+{$IF NOT DEFINED(LCLWIN32)}
+          RecreateWnd(Self);
+{$ELSE}
+          SetWindowLongPtr(Handle, GWL_STYLE, GetWindowLongPtr(Handle, GWL_STYLE) or LONG_PTR(WS_POPUP));
+          SetWindowLongPtr(Handle, GWL_HWNDPARENT, FParentWindow);
+{$ENDIF}
+        end;
         Show;
         try
           EnableWindow(Handle, True);
@@ -411,9 +426,12 @@ var
   Handle: HWND;
   AWindow: QWidgetH;
 begin
-  Handle:= GetWindowHandle(Form);
-  AllowDarkModeForWindow(Handle, True);
-  RefreshTitleBarThemeColor(Handle);
+  if g_darkModeSupported then
+  begin
+    Handle:= GetWindowHandle(Form);
+    AllowDarkModeForWindow(Handle, True);
+    RefreshTitleBarThemeColor(Handle);
+  end;
 
   if (Form is THintWindow) then
   begin
@@ -456,32 +474,6 @@ begin
   end;
 end;
 
-procedure CopyNetNamesToClip(Self, Sender: TObject);
-var
-  I: Integer;
-  sl: TStringList = nil;
-  SelectedFiles: TFiles = nil;
-begin
-  SelectedFiles := frmMain.ActiveFrame.CloneSelectedOrActiveFiles;
-  try
-    if SelectedFiles.Count > 0 then
-    begin
-      sl := TStringList.Create;
-      for I := 0 to SelectedFiles.Count - 1 do
-      begin
-        sl.Add(mbGetRemoteFileName(SelectedFiles[I].FullPath));
-      end;
-
-      Clipboard.Clear; // Prevent multiple formats in Clipboard (specially synedit)
-      Clipboard.AsText := TrimRightLineEnding(sl.Text, sl.TextLineBreakStyle);
-    end;
-
-  finally
-    FreeAndNil(sl);
-    FreeAndNil(SelectedFiles);
-  end;
-end;
-
 procedure CreateShortcut(Self, Sender: TObject);
 var
   ShortcutName: String;
@@ -519,7 +511,7 @@ begin
 end;
 {$ENDIF}
 
-{$IF DEFINED(LCLGTK2) or (DEFINED(LCLQT) and not DEFINED(DARWIN))}
+{$IF DEFINED(LCLGTK2) or ((DEFINED(LCLQT) or DEFINED(LCLQT5)) and not (DEFINED(DARWIN) or DEFINED(MSWINDOWS)))}
 
 procedure ScreenFormEvent(Self, Sender: TObject; Form: TCustomForm);
 {$IF DEFINED(LCLGTK2)}
@@ -529,7 +521,7 @@ begin
   ClassName:= Form.ClassName;
   gtk_window_set_role(PGtkWindow(Form.Handle), PAnsiChar(ClassName));
 end;
-{$ELSEIF DEFINED(LCLQT)}
+{$ELSEIF DEFINED(LCLQT) or DEFINED(LCLQT5)}
 var
   ClassName: WideString;
 begin
@@ -579,8 +571,15 @@ begin
 {$ENDIF}
   // Register network file source
   RegisterVirtualFileSource(rsVfsNetwork, TWinNetFileSource);
-  if (IsUserAdmin = dupAccept) then // if run under administrator
-    MainForm.Caption:= MainForm.Caption + ' - Administrator';
+  if CheckWin32Version(5, 1) then
+    RegisterVirtualFileSource(rsVfsRecycleBin, TRecycleBinFileSource);
+
+  // If run under administrator
+  if (IsUserAdmin = dupAccept) then
+  begin
+    with TfrmMain(MainForm) do
+      StaticTitle:= StaticTitle + ' - Administrator';
+  end;
 
   // Add main window message handler
   {$PUSH}{$HINTS OFF}
@@ -613,9 +612,7 @@ begin
     mnuNetwork.Add(MenuItem);
 
     MenuItem:= TMenuItem.Create(mnuMain);
-    MenuItem.Caption:= rsMnuCopyNetNamesToClip;
-    Handler.Code:= @CopyNetNamesToClip;
-    MenuItem.OnClick:= TNotifyEvent(Handler);
+    MenuItem.Action:= frmMain.actCopyNetNamesToClip;
     mnuNetwork.Add(MenuItem);
 
     MenuItem:= TMenuItem.Create(mnuMain);
@@ -626,7 +623,7 @@ begin
   end;
 end;
 {$ELSE}
-{$IF DEFINED(LCLQT) or DEFINED(LCLGTK2) or DEFINED(DARWIN)}
+{$IF DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLGTK2) or DEFINED(DARWIN)}
 var
   Handler: TMethod;
 {$ENDIF}
@@ -635,10 +632,17 @@ var
 {$ENDIF}
 begin
   if fpGetUID = 0 then // if run under root
-    MainForm.Caption:= MainForm.Caption + ' - ROOT PRIVILEGES';
-
+  begin
+    with TfrmMain(MainForm) do
+      StaticTitle:= StaticTitle + ' - ROOT PRIVILEGES';
+  end;
   {$IF NOT DEFINED(DARWIN)}
-  if HasGio then RegisterVirtualFileSource('GVfs', TGioFileSource, False);
+  if HasGio then
+  begin
+    if TGioFileSource.IsSupportedPath('trash://') then
+      RegisterVirtualFileSource(rsVfsRecycleBin, TTrashFileSource, True);
+    RegisterVirtualFileSource('GVfs', TGioFileSource, False);
+  end;
   {$ENDIF}
 
   {$IF DEFINED(DARWIN) AND DEFINED(LCLQT)}
@@ -646,7 +650,7 @@ begin
   Handler.Data:= MainForm;
   Handler.Code:= @ActiveFormChangedHandler;
   Screen.AddHandlerActiveFormChanged(TScreenFormEvent(Handler), True);
-  {$ELSEIF DEFINED(LCLGTK2) or DEFINED(LCLQT)}
+  {$ELSEIF DEFINED(LCLGTK2) or DEFINED(LCLQT) or DEFINED(LCLQT5)}
   Handler.Data:= MainForm;
   Handler.Code:= @ScreenFormEvent;
   ScreenFormEvent(MainForm, MainForm, MainForm);
@@ -836,7 +840,7 @@ begin
     begin
       if bFlagKeepGoing then
       begin
-        Result := SHChangeIconDialog(Owner.Handle, sFileName, iIconIndex);
+        Result := SHChangeIconDialog(GetWindowHandle(Owner), sFileName, iIconIndex);
         if Result then sFileName := sFileName + ',' + IntToStr(iIconIndex);
       end;
     end
@@ -879,11 +883,77 @@ begin
 end;
 {$ENDIF}
 
+function GetWindowHandle(AHandle: HWND): HWND;
+{$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
+begin
+  Result:= Windows.GetAncestor(HWND(QWidget_winId(TQtWidget(AHandle).GetContainerWidget)), GA_ROOT);
+end;
+{$ELSE}
+begin
+  Result:= AHandle;
+end;
+{$ENDIF}
+
+procedure CopyNetNamesToClip;
+{$IF DEFINED(MSWINDOWS)}
+var
+  I: Integer;
+  sl: TStringList = nil;
+  SelectedFiles: TFiles = nil;
+begin
+  SelectedFiles := frmMain.ActiveFrame.CloneSelectedOrActiveFiles;
+  try
+    if SelectedFiles.Count > 0 then
+    begin
+      sl := TStringList.Create;
+      for I := 0 to SelectedFiles.Count - 1 do
+      begin
+        sl.Add(mbGetRemoteFileName(SelectedFiles[I].FullPath));
+      end;
+
+      Clipboard.Clear; // Prevent multiple formats in Clipboard (specially synedit)
+      Clipboard.AsText := TrimRightLineEnding(sl.Text, sl.TextLineBreakStyle);
+    end;
+
+  finally
+    FreeAndNil(sl);
+    FreeAndNil(SelectedFiles);
+  end;
+end;
+{$ELSE}
+begin
+  msgWarning(rsMsgErrNotSupported);
+end;
+{$ENDIF}
+
 {$IF DEFINED(UNIX) AND NOT DEFINED(DARWIN)}
 procedure ShowOpenWithDialog(TheOwner: TComponent; const FileList: TStringList);
 begin
   fOpenWith.ShowOpenWithDlg(TheOwner, FileList);
 end;
+{$ENDIF}
+
+{$IF DEFINED(UNIX)}
+procedure handle_sigterm(signal: longint); cdecl;
+begin
+  WriteLn('SIGTERM');
+  frmMain.Close;
+end;
+
+procedure RegisterHandler;
+var
+  sa: sigactionrec;
+begin
+  FillChar(sa, SizeOf(sa), #0);
+  sa.sa_handler := @handle_sigterm;
+  if (fpSigAction(SIGTERM, @sa, nil) = -1) then
+  begin
+    Errors.PError('fpSigAction', GetLastOSError);
+  end;
+end;
+
+initialization
+  RegisterHandler;
 {$ENDIF}
 
 finalization

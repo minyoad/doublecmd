@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    Version information about DC, building tools and running environment.
 
-   Copyright (C) 2006-2018  Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2006-2021  Alexander Koblov (alexx2000@mail.ru)
    Copyright (C) 2010       Przemyslaw Nagay (cobines@gmail.com)
 
    This program is free software; you can redistribute it and/or modify
@@ -31,30 +31,27 @@ uses
   Classes, SysUtils, LCLVersion;
 
 {$I dcrevision.inc} // Double Commander revision number
-{$I revision.inc} // Lazarus revision number
 
 const
-  dcVersion   = '1.0.0 alpha';
   dcBuildDate = {$I %DATE%};
   lazVersion  = lcl_version;         // Lazarus version (major.minor.micro)
-  lazRevision = RevisionStr;         // Lazarus SVN revision
   fpcVersion  = {$I %FPCVERSION%};   // FPC version (major.minor.micro)
   TargetCPU   = {$I %FPCTARGETCPU%}; // Target CPU of FPC
   TargetOS    = {$I %FPCTARGETOS%};  // Target Operating System of FPC
 
 var
+  DCVersion,   // Double Commander version
   TargetWS,    // Target WidgetSet of Lazarus
   OSVersion,   // Operating System where DC is run
   WSVersion    // WidgetSet library version where DC is run
   : String;
 
 procedure InitializeVersionInfo;
-function GetLazarusVersion: String;
 
 implementation
 
 uses
-  InterfaceBase
+  InterfaceBase, FileInfo, VersionConsts
   {$IF DEFINED(UNIX)}
   , BaseUnix, DCOSUtils, uDCUtils, DCClassesUtf8
     {$IFDEF DARWIN}
@@ -290,6 +287,20 @@ var
   ReleaseId: UnicodeString;
 {$ENDIF}
 begin
+  with TVersionInfo.Create do
+  begin
+    Load(HINSTANCE);
+    DCVersion:= Format('%d.%d.%.d', [FixedInfo.FileVersion[0],
+                                     FixedInfo.FileVersion[1],
+                                     FixedInfo.FileVersion[2]]);
+    if (FixedInfo.FileFlags and VS_FF_PRERELEASE <> 0) then
+      DCVersion+= ' alpha'
+    else begin
+      DCVersion+= ' beta';
+    end;
+    Free;
+  end;
+
   TargetWS := LCLPlatformDirNames[WidgetSet.LCLPlatform];
 
   {$IF DEFINED(MSWINDOWS)}
@@ -367,12 +378,33 @@ begin
            10: case osvi.dwMinorVersion of
                  0: if (osvi.wProductType = VER_NT_WORKSTATION) then
                     begin
-                      OSVersion := OSVersion + ' 10';
+                      if (osvi.dwBuildNumber >= 22000) then
+                        OSVersion := OSVersion + ' 11'
+                      else begin
+                        OSVersion := OSVersion + ' 10';
+                      end;
                       if (osvi.wSuiteMask and VER_SUITE_PERSONAL <> 0) then
                         OSVersion := OSVersion + ' Home';
-                      if RegReadKey(HKEY_LOCAL_MACHINE, CURRENT_VERSION, 'ReleaseId', ReleaseId) then
+                      if ((osvi.dwBuildNumber >= 19042) and
+                         RegReadKey(HKEY_LOCAL_MACHINE, CURRENT_VERSION, 'DisplayVersion', ReleaseId)) or
+                         RegReadKey(HKEY_LOCAL_MACHINE, CURRENT_VERSION, 'ReleaseId', ReleaseId) then
+                      begin
                         OSVersion := OSVersion + ' ' + String(ReleaseId);
+                      end;
                     end
+                    else if (osvi.wProductType = VER_NT_SERVER) then
+                    begin
+                      OSVersion += ' Server ';
+                      case osvi.dwBuildNumber of
+                        14393: OSVersion += '2016';
+                        17763: OSVersion += '2019';
+                        18363: OSVersion += '1909';
+                        19041: OSVersion += '2004';
+                        19042: OSVersion += '20H2';
+                        20348: OSVersion += '2022';
+                        else   OSVersion += '10.0.' + IntToStr(osvi.dwBuildNumber);
+                      end;
+                    end;
               end;
           end;
         end;
@@ -452,18 +484,6 @@ begin
                         IntToStr(gtk_minor_version) + '.' +
                         IntToStr(gtk_micro_version);
   {$ENDIF}
-end;
-
-function GetLazarusVersion: String;
-var
-  I: Integer = 1;
-begin
-  Result:= lazVersion;
-  while (I <= Length(lazRevision)) and (lazRevision[I] in ['0'..'9']) do
-    Inc(I);
-  if (I > 1) then begin
-    Result += '-' + Copy(lazRevision, 1, I - 1);
-  end;
 end;
 
 procedure Initialize;

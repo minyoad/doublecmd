@@ -197,7 +197,7 @@ type
     function Clone(NewParent: TWinControl): TColumnsFileView; override;
     procedure CloneTo(FileView: TFileView); override;
 
-    procedure AddFileSource(aFileSource: IFileSource; aPath: String); override;
+    function AddFileSource(aFileSource: IFileSource; aPath: String): Boolean; override;
 
     procedure LoadConfiguration(AConfig: TXmlConfig; ANode: TXmlNode); override;
     procedure SaveConfiguration(AConfig: TXmlConfig; ANode: TXmlNode; ASaveHistory:boolean); override;
@@ -301,7 +301,11 @@ begin
   ANode := AConfig.FindNode(ANode, 'ColumnsView', True);
   AConfig.ClearNode(ANode);
 
-  AConfig.SetValue(ANode, 'ColumnsSet', ActiveColm);
+  with FileSource do
+  begin
+    if (FileSystem = EmptyStr) or (FileSystem = FS_GENERAL) then
+      AConfig.SetValue(ANode, 'ColumnsSet', ActiveColm);
+  end;
 end;
 
 procedure TColumnsFileView.dgPanelHeaderClick(Sender: TObject;
@@ -771,6 +775,7 @@ begin
   FilePropertiesNeeded := GetFilePropertiesNeeded;
   if FilePropertiesNeeded >= OldFilePropertiesNeeded then
   begin
+    ReleaseBusy;
     Notify([fvnVisibleFilePropertiesChanged]);
   end;
 end;
@@ -899,11 +904,11 @@ begin
   end;
 end;
 
-procedure TColumnsFileView.AddFileSource(aFileSource: IFileSource; aPath: String);
+function TColumnsFileView.AddFileSource(aFileSource: IFileSource; aPath: String): Boolean;
 begin
-  inherited AddFileSource(aFileSource, aPath);
+  Result:= inherited AddFileSource(aFileSource, aPath);
 
-  if not IsLoadingFileList then
+  if Result and (not IsLoadingFileList) then
   begin
     FUpdatingActiveFile := True;
     dgPanel.Row := 0;
@@ -1156,8 +1161,9 @@ end;
 procedure TColumnsFileView.cm_CopyFileDetailsToClip(const Params: array of string);
 var
   I: Integer;
+  sl: TStringList;
   AFile: TDisplayFile;
-  sl: TStringList = nil;
+  ColumnsClass: TPanelColumnsClass;
 
   procedure AddFile;
   var
@@ -1167,6 +1173,10 @@ var
     if AFile.FSFile.IsNameValid then
     begin
       S:= EmptyStr;
+      if AFile.DisplayStrings.Count = 0 then
+      begin
+        MakeColumnsStrings(AFile, ColumnsClass);
+      end;
       for J:= 0 to AFile.DisplayStrings.Count - 1 do
       begin
         S:= S + AFile.DisplayStrings[J] + #09;
@@ -1181,6 +1191,8 @@ begin
   begin
     sl:= TStringList.Create;
     try
+      ColumnsClass:= GetColumnsClass;
+
       for I:= 0 to FFiles.Count - 1 do
       begin
         AFile:= FFiles[I];
@@ -1577,8 +1589,15 @@ var
 
     if AFile.RecentlyUpdatedPct <> 0 then
     begin
-      TextColor := LightColor(TextColor, AFile.RecentlyUpdatedPct);
-      BackgroundColor := LightColor(BackgroundColor, AFile.RecentlyUpdatedPct);
+      if ColorIsLight(BackgroundColor) then
+      begin
+        TextColor := LightColor(TextColor, AFile.RecentlyUpdatedPct);
+        BackgroundColor := LightColor(BackgroundColor, AFile.RecentlyUpdatedPct)
+      end
+      else begin
+        TextColor := DarkColor(TextColor, AFile.RecentlyUpdatedPct);
+        BackgroundColor := DarkColor(BackgroundColor, AFile.RecentlyUpdatedPct);
+      end;
     end;
 
     // Draw background.
@@ -1938,7 +1957,7 @@ begin
                 // General columns set
                 for I:= 0 to ColSet.Items.Count - 1 do
                 begin
-                  if not SameText(FileSystem, ColSet.GetColumnSet(I).FileSystem) then
+                  if SameText(FS_GENERAL, ColSet.GetColumnSet(I).FileSystem) then
                   begin
                     MI:= TMenuItem.Create(ColumnsView.pmColumnsMenu);
                     MI.Tag:= I;

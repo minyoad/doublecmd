@@ -3,7 +3,7 @@ Compiling Double Commander
 1) What you need?
 
 Double Commander is developed with Free Pascal and Lazarus.
-Current version requires at least FPC 3.0.4 and Lazarus 1.8.2.
+Current version requires at least FPC 3.2.0 and Lazarus 2.0.12.
 
 2) Using the IDE to develop and build DC.
 
@@ -44,12 +44,12 @@ Execute the script to start the build process. Make sure you use all parameter
 if you're building for the first time, so that also components and plugins are
 built:
 
-> build.bat all
+> build.bat release
 
 or alternatively without plugins
 
 > build.bat components
-> build.bat
+> build.bat doublecmd
 
 From command line (Linux)
 
@@ -69,9 +69,9 @@ Execute the script to start the build process. Make sure you use all parameter
 if you're building for the first time, so that also components and plugins are
 built:
 
-$ ./build.sh all
+$ ./build.sh release
 
 or alternatively without plugins
 
 $ ./build.sh components
-$ ./build.sh
+$ ./build.sh doublecmd

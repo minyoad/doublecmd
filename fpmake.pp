@@ -13,18 +13,19 @@ const
   CommonComponents: array[1..9] of String =
   (
     'components\chsdet\chsdet.lpk',
-    'components\CmdLine\cmdbox.lpk',
     'components\multithreadprocs\multithreadprocslaz.lpk',
     'components\dcpcrypt\dcpcrypt.lpk',
     'components\doublecmd\doublecmd_common.lpk',
     'components\KASToolBar\kascomp.lpk',
     'components\viewer\viewerpackage.lpk',
     'components\gifanim\pkg_gifanim.lpk',
-    'components\synunihighlighter\synuni.lpk'
+    'components\synunihighlighter\synuni.lpk',
+    'components\virtualterminal\virtualterminal.lpk'
   );
 
-  CommonPlugins: array[1..8] of String =
+  CommonPlugins: array[1..9] of String =
   (
+    'plugins/wcx/base64/src/base64wcx.lpi',
     'plugins/wcx/deb/src/deb.lpi',
     'plugins/wcx/rpm/src/rpm.lpi',
     'plugins/wcx/unrar/src/unrar.lpi',
@@ -48,9 +49,12 @@ const
     'plugins/wcx/cpio/src/cpio.lpi'
   );
 
-  WindowsPlugins: array[1..1] of String =
+  WindowsPlugins: array[1..4] of String =
   (
-    'plugins/wcx/sevenzip/src/SevenZipWcx.lpi'
+    'plugins\wcx\sevenzip\src\SevenZipWcx.lpi',
+    'plugins\wlx\richview\src\richview.lpi',
+    'plugins\wlx\preview\src\preview.lpi',
+    'plugins\wlx\wmp\src\wmp.lpi'
   );
 
   DeleteFiles: array[1..6] of String =
@@ -258,10 +262,10 @@ begin
   BuildPlugins;
   // Set default build mode
   if Pos('--bm=', FLazBuildParams) = 0 then
-    FLazBuildParams+= ' --bm=beta';
+    FLazBuildParams+= ' --bm=release';
   // Build Double Commander
   BuildEngine.ExecuteCommand(FLazBuild, SetDirSeparators('src/doublecmd.lpi') + FLazBuildParams);
-  if Pos('--bm=beta', FLazBuildParams) > 0 then
+  if Pos('--bm=release', FLazBuildParams) > 0 then
   begin
     // Build Dwarf LineInfo Extractor
     BuildEngine.ExecuteCommand(FLazBuild, SetDirSeparators('tools/extractdwrflnfo.lpi'));

@@ -3,7 +3,7 @@
     -------------------------------------------------------------------------
     Shell context menu implementation.
 
-    Copyright (C) 2006-2015 Alexander Koblov (alexx2000@mail.ru)
+    Copyright (C) 2006-2021 Alexander Koblov (alexx2000@mail.ru)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,8 +16,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    along with this program. If not, see <http://www.gnu.org/licenses/>.
 }
 
 unit uShellContextMenu;
@@ -43,6 +42,7 @@ const
   sCmdVerbLink = 'link';
   sCmdVerbProperties = 'properties';
   sCmdVerbNewFolder = 'NewFolder';
+  sCmdVerbCopyPath = 'copyaspath';
 
 type
 
@@ -61,6 +61,8 @@ type
     FShellMenu1: IContextMenu;
     FShellMenu: HMENU;
     FUserWishForContextMenu: TUserWishForContextMenu;
+  protected
+    procedure Execute(Data: PtrInt);
   public
     constructor Create(Parent: TWinControl; var Files: TFiles; Background: boolean; UserWishForContextMenu: TUserWishForContextMenu = uwcmComplete); reintroduce;
     destructor Destroy; override;
@@ -76,7 +78,8 @@ implementation
 uses
   graphtype, intfgraphics, Graphics, uPixMapManager, Dialogs, uLng, uMyWindows,
   uShellExecute, fMain, uDCUtils, uFormCommands, DCOSUtils, uOSUtils, uShowMsg,
-  uExts, uFileSystemFileSource, DCConvertEncoding, LazUTF8, uOSForms, uGraphics;
+  uExts, uFileSystemFileSource, DCConvertEncoding, LazUTF8, uOSForms, uGraphics,
+  Forms, DCWindows, DCStrUtils, Clipbrd, uFileSystemWatcher;
 
 const
   USER_CMD_ID = $1000;
@@ -149,7 +152,7 @@ begin
       if Files[I].Name = EmptyStr then
         S := EmptyWideStr
       else
-        S := UTF8Decode(Files[I].Path);
+        S := CeUtf8ToUtf16(Files[I].Path);
 
       OleCheckUTF8(DeskTopFolder.ParseDisplayName(Handle, nil, PWideChar(S), pchEaten, PathPIDL, dwAttributes));
       try
@@ -159,9 +162,9 @@ begin
       end;
 
       if Files[I].Name = EmptyStr then
-        S := UTF8Decode(Files[I].Path)
+        S := CeUtf8ToUtf16(Files[I].Path)
       else
-        S := UTF8Decode(Files[I].Name);
+        S := CeUtf8ToUtf16(Files[I].Name);
 
       OleCheckUTF8(Folder.ParseDisplayName(Handle, nil, PWideChar(S), pchEaten, tmpPIDL, dwAttributes));
       (List + i)^ := tmpPIDL;
@@ -195,7 +198,7 @@ begin
 
   if Files.Count > 0 then
   begin
-    wsFileName := UTF8Decode(Files[0].FullPath);
+    wsFileName := CeUtf8ToUtf16(Files[0].FullPath);
     OleCheckUTF8(SHGetDesktopFolder(DesktopFolder));
     try
       OleCheckUTF8(DesktopFolder.ParseDisplayName(Handle, nil, PWideChar(wsFileName), pchEaten, PathPIDL, dwAttributes));
@@ -281,7 +284,6 @@ end;
 procedure CreateActionSubMenu(MenuWhereToAdd: HMenu; paramExtActionList: TExtActionList; aFile: TFile; bIncludeViewEdit: boolean);
 const
   Always_Legacy_Action_Count = 2;
-  DCIconRequired = True;
 var
   I, iDummy: integer;
   sAct: String;
@@ -311,9 +313,9 @@ var
   procedure LocalInsertMenuItemExternal(MenuDispatcher: integer; BitmapProvided: TBitmap = nil);
   begin
     if BitmapProvided = nil then
-      InsertMenuItemEx(MenuWhereToAdd, 0, PWChar(UTF8Decode(paramExtActionList.ExtActionCommand[MenuDispatcher].ActionName)), iMenuPositionInsertion, MenuDispatcher + USER_CMD_ID, MFT_STRING, paramExtActionList.ExtActionCommand[MenuDispatcher].IconBitmap)
+      InsertMenuItemEx(MenuWhereToAdd, 0, PWChar(CeUtf8ToUtf16(paramExtActionList.ExtActionCommand[MenuDispatcher].ActionName)), iMenuPositionInsertion, MenuDispatcher + USER_CMD_ID, MFT_STRING, paramExtActionList.ExtActionCommand[MenuDispatcher].IconBitmap)
     else
-      InsertMenuItemEx(MenuWhereToAdd, 0, PWChar(UTF8Decode(paramExtActionList.ExtActionCommand[MenuDispatcher].ActionName)), iMenuPositionInsertion, MenuDispatcher + USER_CMD_ID, MFT_STRING, BitmapProvided);
+      InsertMenuItemEx(MenuWhereToAdd, 0, PWChar(CeUtf8ToUtf16(paramExtActionList.ExtActionCommand[MenuDispatcher].ActionName)), iMenuPositionInsertion, MenuDispatcher + USER_CMD_ID, MFT_STRING, BitmapProvided);
 
     Inc(iMenuPositionInsertion);
   end;
@@ -476,12 +478,34 @@ end;
 
 { TShellContextMenu }
 
+procedure TShellContextMenu.Execute(Data: PtrInt);
+var
+  UserSelectedCommand: TExtActionCommand absolute Data;
+begin
+  try
+    with frmMain.ActiveFrame do
+    begin
+      try
+        //For the %-Variable replacement that follows it might sounds incorrect to do it with "nil" instead of "aFile",
+        //but original code was like that. It is useful, at least, when more than one file is selected so because of that,
+        //it's pertinent and should be kept!
+        ProcessExtCommandFork(UserSelectedCommand.CommandName, UserSelectedCommand.Params, UserSelectedCommand.StartPath, nil);
+      except
+        on e: EInvalidCommandLine do
+          MessageDlg(rsMsgErrorInContextMenuCommand, rsMsgInvalidCommandLine + ': ' + e.Message, mtError, [mbOK], 0);
+      end;
+    end;
+  finally
+    FreeAndNil(UserSelectedCommand);
+  end;
+end;
+
 { TShellContextMenu.Create }
 constructor TShellContextMenu.Create(Parent: TWinControl; var Files: TFiles; Background: boolean; UserWishForContextMenu: TUserWishForContextMenu);
 var
   UFlags: UINT = CMF_EXPLORE;
 begin
-  FParent:= GetWindowHandle(Parent);
+  FParent:= GetControlHandle(Parent);
   // Replace window procedure
 {$PUSH}{$HINTS OFF}
   OldWProc := WNDPROC(SetWindowLongPtr(FParent, GWL_WNDPROC, LONG_PTR(@MyWndProc)));
@@ -499,7 +523,7 @@ begin
   end;
   try
     try
-      FShellMenu1 := GetShellContextMenu(Parent.Handle, Files, Background);
+      FShellMenu1 := GetShellContextMenu(FParent, Files, Background);
       if Assigned(FShellMenu1) then
       begin
         FShellMenu := CreatePopupMenu;
@@ -569,37 +593,37 @@ begin
 
               // Add commands to root of context menu
               I := InnerExtActionList.Add(TExtActionCommand.Create(FormCommands.GetCommandCaption('cm_Refresh'), 'cm_Refresh', '', ''));
-              InsertMenuItemEx(FShellMenu, 0, PWideChar(UTF8Decode(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
+              InsertMenuItemEx(FShellMenu, 0, PWideChar(CeUtf8ToUtf16(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
 
               // Add "Sort by" submenu
               hActionsSubMenu := CreatePopupMenu;
               I := InnerExtActionList.Add(TExtActionCommand.Create(FormCommands.GetCommandCaption('cm_ReverseOrder'), 'cm_ReverseOrder', '', ''));
-              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(UTF8Decode(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
+              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(CeUtf8ToUtf16(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
 
               // Add separator
               InsertMenuItemEx(hActionsSubMenu, 0, nil, 0, 0, MFT_SEPARATOR);
 
               // Add "Sort by" items
               I := InnerExtActionList.Add(TExtActionCommand.Create(FormCommands.GetCommandCaption('cm_SortByAttr'), 'cm_SortByAttr', '', ''));
-              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(UTF8Decode(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
+              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(CeUtf8ToUtf16(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
               I := InnerExtActionList.Add(TExtActionCommand.Create(FormCommands.GetCommandCaption('cm_SortByDate'), 'cm_SortByDate', '', ''));
-              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(UTF8Decode(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
+              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(CeUtf8ToUtf16(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
               I := InnerExtActionList.Add(TExtActionCommand.Create(FormCommands.GetCommandCaption('cm_SortBySize'), 'cm_SortBySize', '', ''));
-              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(UTF8Decode(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
+              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(CeUtf8ToUtf16(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
               I := InnerExtActionList.Add(TExtActionCommand.Create(FormCommands.GetCommandCaption('cm_SortByExt'), 'cm_SortByExt', '', ''));
-              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(UTF8Decode(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
+              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(CeUtf8ToUtf16(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
               I := InnerExtActionList.Add(TExtActionCommand.Create(FormCommands.GetCommandCaption('cm_SortByName'), 'cm_SortByName', '', ''));
-              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(UTF8Decode(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
+              InsertMenuItemEx(hActionsSubMenu, 0, PWideChar(CeUtf8ToUtf16(InnerExtActionList.ExtActionCommand[I].ActionName)), 0, I + USER_CMD_ID, MFT_STRING);
 
               // Add submenu to context menu
-              InsertMenuItemEx(FShellMenu, hActionsSubMenu, PWideChar(UTF8Decode(rsMnuSortBy)), 1, 333, MFT_STRING);
+              InsertMenuItemEx(FShellMenu, hActionsSubMenu, PWideChar(CeUtf8ToUtf16(rsMnuSortBy)), 1, 333, MFT_STRING);
 
               // Add menu separator
               InsertMenuItemEx(FShellMenu, 0, nil, 2, 0, MFT_SEPARATOR);
 
               // Add commands to root of context menu
               I := InnerExtActionList.Add(TExtActionCommand.Create(FormCommands.GetCommandCaption('cm_PasteFromClipboard'), 'cm_PasteFromClipboard', '', ''));
-              InsertMenuItemEx(FShellMenu, 0, PWideChar(UTF8Decode(InnerExtActionList.ExtActionCommand[I].ActionName)), 3, I + USER_CMD_ID, MFT_STRING);
+              InsertMenuItemEx(FShellMenu, 0, PWideChar(CeUtf8ToUtf16(InnerExtActionList.ExtActionCommand[I].ActionName)), 3, I + USER_CMD_ID, MFT_STRING);
 
               // Add menu separator
               InsertMenuItemEx(FShellMenu, 0, nil, 4, 0, MFT_SEPARATOR);
@@ -627,7 +651,7 @@ begin
               end;
 
               if FUserWishForContextMenu = uwcmComplete then
-                InsertMenuItemEx(FShellMenu, hActionsSubMenu, PWideChar(UTF8Decode(rsMnuActions)), I, 333, MFT_STRING);
+                InsertMenuItemEx(FShellMenu, hActionsSubMenu, PWideChar(CeUtf8ToUtf16(rsMnuActions)), I, 333, MFT_STRING);
             end;
             { /Actions submenu }
           end;
@@ -682,6 +706,24 @@ begin
           begin
             TShellThread.Create(FParent, FShellMenu1, sVerb).Start;
             bHandled := True;
+          end
+          else if SameText(sVerb, sCmdVerbCopyPath) then
+          begin
+            with TStringList.Create do
+            begin
+              for i:= 0 to FFiles.Count - 1 do
+              begin
+                sVolumeLabel:= FFiles[i].FullPath;
+                if UTF8Length(sVolumeLabel) >= MAX_PATH then
+                  Add(QuoteStr(UTF16ToUTF8(UTF16LongName(sVolumeLabel))))
+                else begin
+                  Add(QuoteStr(sVolumeLabel));
+                end;
+              end;
+              Clipboard.AsText:= TrimRightLineEnding(Text, TextLineBreakStyle);
+              Free;
+            end;
+            bHandled := True;
           end;
         end;
 
@@ -713,12 +755,28 @@ begin
           end;
 
           Result := FShellMenu1.InvokeCommand(lpici);
-          if not (Succeeded(Result) or (Result = COPYENGINE_E_USER_CANCELLED)) then
-            OleErrorUTF8(Result);
+
+          if not Succeeded(Result) then
+          begin
+            case Result of
+              COPYENGINE_E_USER_CANCELLED,
+              E_FAIL: ; // Ignore
+            else
+              OleErrorUTF8(Result);
+            end;
+          end;
 
           // Reload after possible changes on the filesystem.
           if SameText(sVerb, sCmdVerbLink) or SameText(sVerb, sCmdVerbDelete) then
             frmMain.ActiveFrame.FileSource.Reload(frmMain.ActiveFrame.CurrentPath);
+
+          // "New" submenu
+          if FBackground and (StrBegins(sVerb, ExtensionSeparator)) then
+          begin
+            sVolumeLabel:= frmMain.ActiveFrame.CurrentPath;
+            if not (TFileSystemWatcher.CanWatch([sVolumeLabel]) and frmMain.ActiveFrame.WatcherActive) then
+              frmMain.ActiveFrame.FileSource.Reload(sVolumeLabel);
+          end;
         end;
 
       end // if cmd > 0
@@ -737,33 +795,15 @@ begin
         end
         else
         begin
-          try
-            with frmMain.ActiveFrame do
-            begin
-              try
-                //For the %-Variable replacement that follows it might sounds incorrect to do it with "nil" instead of "aFile",
-                //but original code was like that. It is useful, at least, when more than one file is selected so because of that,
-                //it's pertinent and should be kept!
-                ProcessExtCommandFork(UserSelectedCommand.CommandName, UserSelectedCommand.Params, UserSelectedCommand.StartPath, nil);
-              except
-                on e: EInvalidCommandLine do
-                  MessageDlg(rsMsgErrorInContextMenuCommand, rsMsgInvalidCommandLine + ': ' + e.Message, mtError, [mbOK], 0);
-              end;
-            end;
-          finally
-            bHandled := True;
-          end;
+          Application.QueueAsyncCall(Execute, PtrInt(UserSelectedCommand));
+          UserSelectedCommand := nil;
+          bHandled := True;
         end;
       end;
     finally
-      if Assigned(InnerExtActionList) then
-        FreeAndNil(InnerExtActionList);
-
-      if Assigned(UserSelectedCommand) then
-        FreeAndNil(UserSelectedCommand);
-
-      if Assigned(ContextMenuDCIcon) then
-        FreeAndNil(ContextMenuDCIcon);
+      FreeAndNil(InnerExtActionList);
+      FreeAndNil(UserSelectedCommand);
+      FreeAndNil(ContextMenuDCIcon);
     end;
 
   except

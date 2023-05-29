@@ -75,6 +75,8 @@ private
 
   function count(): Integer;
   function getItem( index:Integer ): TInternalEvent;
+
+  procedure adjustSymlinkIfNecessary( index:Integer; watchPath:String; watchRealPath:String );
   procedure adjustRenamedEventIfNecessary( index:Integer );
   function isRenamed( event:TInternalEvent ): Boolean;
 
@@ -110,6 +112,7 @@ type TDarwinFSWatchCallBack = Procedure( event:TDarwinFSWatchEvent ) of object;
 type TDarwinFSWatcher = class
 private
   _watchPaths: NSMutableArray;
+  _watchRealPaths: NSMutableArray;
   _streamPaths: NSArray;
   _watchSubtree: Boolean;
 
@@ -479,10 +482,24 @@ begin
   end;
 end;
 
+procedure TDarwinFSWatchEventSession.adjustSymlinkIfNecessary( index:Integer; watchPath:String; watchRealPath:String );
+var
+  currentEvent: TInternalEvent;
+begin
+  if watchPath=watchRealPath then exit;
+  currentEvent:= Items[index];
+  currentEvent.path:= watchPath + currentEvent.path.Substring(watchRealPath.Length);
+
+  if currentEvent.renamedPath.IsEmpty then exit;
+  if not currentEvent.renamedPath.StartsWith(watchRealPath) then exit;
+  currentEvent.renamedPath:= watchPath + currentEvent.renamedPath.Substring(watchRealPath.Length);
+end;
+
 constructor TDarwinFSWatcher.create( const callback:TDarwinFSWatchCallBack; const watchSubtree:Boolean; const latency:Integer );
 begin
   Inherited Create;
   _watchPaths:= NSMutableArray.alloc.initWithCapacity( 16 );
+  _watchRealPaths:= NSMutableArray.alloc.initWithCapacity( 16 );
   _watchSubtree:= watchSubtree;
 
   _callback:= callback;
@@ -502,6 +519,8 @@ begin
   FreeAndNil( _pathsSyncObject );
   _watchPaths.release;
   _watchPaths:= nil;
+  _watchRealPaths.release;
+  _watchRealPaths:= nil;
   _streamPaths.release;
   _streamPaths:= nil;
   Inherited;
@@ -515,41 +534,68 @@ procedure cdeclFSEventsCallback(
   eventFlags: FSEventStreamEventFlagsPtr;
   {%H-}eventIds: FSEventStreamEventIdPtr ); cdecl;
 var
+  pool: NSAutoReleasePool;
   watcher: TDarwinFSWatcher absolute clientCallBackInfo;
   session: TDarwinFSWatchEventSession;
 begin
+  pool:= NSAutoreleasePool.alloc.init;
   session:= TDarwinFSWatchEventSession.create( numEvents, eventPaths, eventFlags );
   watcher.handleEvents( session );
+  pool.release;
   // seesion released in handleEvents()
 end;
 
 procedure TDarwinFSWatcher.handleEvents( const originalSession:TDarwinFSWatchEventSession );
 var
+  tempWatchPaths: NSArray;
+  tempWatchRealPaths: NSArray;
   watchPath: String;
+  watchRealPath: String;
   event: TInternalEvent;
   pathIndex: Integer;
   i: Integer;
   session: TDarwinFSWatchEventSession;
 begin
-  for pathIndex:=0 to _streamPaths.count-1 do
-  begin
-    watchPath:= NSString(_streamPaths.objectAtIndex(pathIndex)).UTF8String;
-    if pathIndex=_streamPaths.count-1 then
-      session:= originalSession
-    else
-      session:= originalSession.deepCopy();
-    i:= 0;
-    while i < session.count do
-    begin
-      event:= session[i];
-      if isMatchWatchPath(event, watchPath, _watchSubtree) then
-      begin
-        session.adjustRenamedEventIfNecessary( i );
-        doCallback( watchPath, event );
-      end;
-      inc( i );
+  try
+    _lockObject.Acquire;
+    try
+      tempWatchPaths:= _watchPaths.copy;
+      tempWatchRealPaths:= _watchRealPaths.copy;
+    finally
+      _lockObject.Release;
     end;
-    session.Free;
+
+    if tempWatchPaths.count=0 then
+    begin
+      originalSession.Free;
+      exit;
+    end;
+
+    for pathIndex:=0 to tempWatchPaths.count-1 do
+    begin
+      watchPath:= NSString(tempWatchPaths.objectAtIndex(pathIndex)).UTF8String;
+      watchRealPath:= NSString(tempWatchRealPaths.objectAtIndex(pathIndex)).UTF8String;
+      if pathIndex=tempWatchPaths.count-1 then
+        session:= originalSession
+      else
+        session:= originalSession.deepCopy();
+      i:= 0;
+      while i < session.count do
+      begin
+        event:= session[i];
+        if isMatchWatchPath(event, watchRealPath, _watchSubtree) then
+        begin
+          session.adjustRenamedEventIfNecessary( i );
+          session.adjustSymlinkIfNecessary( i, watchPath, watchRealPath );
+          doCallback( watchPath, event );
+        end;
+        inc( i );
+      end;
+      session.Free;
+    end;
+  finally
+    tempWatchPaths.Release;
+    tempWatchRealPaths.Release;
   end;
 end;
 
@@ -602,12 +648,16 @@ begin
 end;
 
 procedure TDarwinFSWatcher.start;
+var
+  pool: NSAutoReleasePool;
 begin
   _running:= true;
   _runLoop:= CFRunLoopGetCurrent();
   _thread:= TThread.CurrentThread;
 
   repeat
+
+    pool:= NSAutoreleasePool.alloc.init;
 
     _lockObject.Acquire;
     try
@@ -620,6 +670,8 @@ begin
       CFRunLoopRun
     else
       waitPath;
+
+    pool.release;
 
   until not _running;
 end;
@@ -646,9 +698,24 @@ begin
     notifyPath;
 end;
 
+function realpath(__name:Pchar; __resolved:Pchar):Pchar;cdecl;external clib name 'realpath';
+
+function toRealPath( path:String ): String;
+var
+  buf: array[0..PATH_MAX] of char;
+  resolvedPath: pchar;
+begin
+  resolvedPath:= realpath( pchar(path), buf );
+  if resolvedPath<>nil then
+    Result:= resolvedPath
+  else
+    Result:= path;
+end;
+
 procedure TDarwinFSWatcher.addPath( path:String );
 var
   nsPath: NSString;
+  nsRealPath: NSString;
 begin
   _lockObject.Acquire;
   try
@@ -657,6 +724,10 @@ begin
     nsPath:= StringToNSString( path );
     if _watchPaths.containsObject(nsPath) then exit;
     _watchPaths.addObject( nsPath );
+
+    nsRealPath:= StringToNSString( toRealPath(path) );
+    _watchRealPaths.addObject( nsRealPath );
+
     interrupt;
   finally
     _lockObject.Release;
@@ -665,6 +736,7 @@ end;
 
 procedure TDarwinFSWatcher.removePath( path:String );
 var
+  index: NSInteger;
   nsPath: NSString;
 begin
   _lockObject.Acquire;
@@ -672,8 +744,13 @@ begin
     if path<>PathDelim then
       path:= ExcludeTrailingPathDelimiter(path);
     nsPath:= StringToNSString( path );
-    if not _watchPaths.containsObject(nsPath) then exit;
-    _watchPaths.removeObject( nsPath );
+
+    index:= _watchPaths.indexOfObject( nsPath );
+    if index = NSNotFound then exit;
+
+    _watchPaths.removeObjectAtIndex( index );
+    _watchRealPaths.removeObjectAtIndex( index );
+
     interrupt;
   finally
     _lockObject.Release;
@@ -686,6 +763,7 @@ begin
   try
     if _watchPaths.count = 0 then exit;
     _watchPaths.removeAllObjects;
+    _watchRealPaths.removeAllObjects;
     interrupt;
   finally
     _lockObject.Release;

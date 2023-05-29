@@ -4,7 +4,7 @@
    Base class for file views which have a main control with a list of files.
 
    Copyright (C) 2012  Przemyslaw Nagay (cobines@gmail.com)
-   Copyright (C) 2015-2018  Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2015-2023  Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,14 +19,6 @@
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
-   Notes:
-   1. PR #550 #556 are the workaround for the bug of Lazarus.
-      related codes can be removed after Lazarus merges related Patches.
-      see also:
-      https://github.com/doublecmd/doublecmd/pull/550
-      https://github.com/doublecmd/doublecmd/pull/556
-      https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/40008
 }
 
 unit uFileViewWithMainCtrl;
@@ -69,22 +61,18 @@ type
 
   TEditButtonEx = class(TEditButton)
   private
-{$IFDEF LCLCOCOA}
-    originalText: String;
-    keyDownText: String;
-{$ENDIF}
     procedure handleSpecialKeys( Key: Word );
     function GetFont: TFont;
     procedure SetFont(AValue: TFont);
   protected
+    // Workaround: https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/36006
+{$IF DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6)}
+    procedure Hack(Data: PtrInt);
+    procedure EditExit; override;
+{$ENDIF}
     function CalcButtonVisible: Boolean; override;
     function GetDefaultGlyphName: String; override;
     procedure EditKeyDown(var Key: word; Shift: TShiftState); override;
-{$IFDEF LCLCOCOA}
-    procedure EditEnter; override;
-    procedure EditChange; override;
-    procedure EditKeyUp(var Key: word; Shift: TShiftState); override;
-{$ENDIF}
   public
     onKeyESCAPE: TNotifyEvent;
     onKeyRETURN: TNotifyEvent;
@@ -143,6 +131,7 @@ type
        or after dropping something after dragging with right mouse button.
     }
     FMainControlMouseDown: Boolean;
+    FMainControlMouseDownPoint: TPoint;
     FMouseSelectionStartIndex: Integer;
     FMouseSelectionLastState: Boolean;
     FDragStartPoint: TPoint;
@@ -259,49 +248,6 @@ type
 
 { TEditButtonEx }
 
-{$IFDEF LCLCOCOA}
-procedure TEditButtonEx.EditEnter;
-begin
-  inherited EditEnter;
-  self.originalText:= self.Text;
-end;
-
-procedure TEditButtonEx.EditChange;
-begin
-  inherited EditChange;
-  self.originalText:= self.Text;
-end;
-
-procedure TEditButtonEx.EditKeyDown( var Key: Word; Shift: TShiftState );
-begin
-  case Key of
-    VK_ESCAPE:
-      self.keyDownText:= self.Text;
-    VK_RETURN,
-    VK_SELECT:
-      self.keyDownText:= self.originalText
-  end;
-  inherited EditKeyDown( Key, Shift );
-end;
-
-procedure TEditButtonEx.EditKeyUp( var Key: Word; Shift: TShiftState );
-begin
-  case Key of
-    VK_ESCAPE,
-    VK_RETURN,
-    VK_SELECT:
-      if self.text=self.keyDownText then
-        // from the text has not been changed,
-        // the EditButton is not in the IME state
-        handleSpecialKeys( Key )
-      else
-        Key:= 0;
-  end;
-  inherited EditKeyUp( Key, Shift );
-end;
-
-{$ELSE}
-
 procedure TEditButtonEx.EditKeyDown(var Key: Word; Shift: TShiftState);
 begin
   inherited EditKeyDown(Key, Shift);
@@ -321,8 +267,6 @@ begin
   end;
 end;
 
-{$ENDIF}
-
 procedure TEditButtonEx.handleSpecialKeys( Key: Word );
 begin
   if Key=VK_ESCAPE then begin
@@ -341,6 +285,23 @@ procedure TEditButtonEx.SetFont(AValue: TFont);
 begin
   BaseEditor.Font:= AValue;
 end;
+
+{$IF DEFINED(LCLQT) or DEFINED(LCLQT5) or DEFINED(LCLQT6)}
+procedure TEditButtonEx.Hack(Data: PtrInt);
+begin
+  if (csClicked in Button.ControlState) then
+  begin
+    BuddyClick;
+    Button.ControlState:= Button.ControlState - [csClicked];
+  end;
+  inherited EditExit;
+end;
+
+procedure TEditButtonEx.EditExit;
+begin
+  Application.QueueAsyncCall(@Hack, 0);
+end;
+{$ENDIF}
 
 function TEditButtonEx.GetDefaultGlyphName: String;
 begin
@@ -604,7 +565,7 @@ end;
 
 procedure TFileViewWithMainCtrl.UpdateColor;
 begin
-  MainControl.Color := DimColor(gBackColor);
+  MainControl.Color := DimColor(gColors.FilePanel^.BackColor);
 end;
 
 procedure TFileViewWithMainCtrl.FinalizeDragDropEx(AControl: TWinControl);
@@ -679,7 +640,7 @@ begin
 {$ENDIF}
 
   FStartDrag := False; // don't start drag on double click
-  Point := MainControl.ScreenToClient(Mouse.CursorPos);
+  Point := FMainControlMouseDownPoint;
 
   // If on a file/directory then choose it.
   FileIndex := GetFileIndexFromCursor(Point.x, Point.y, AtFileList);
@@ -893,6 +854,7 @@ var
   AFile, APreviousFile: TDisplayFile;
 begin
   SetDragCursor(Shift);
+  FMainControlMouseDownPoint:= Classes.Point(X, Y);
   if (DragManager <> nil) and DragManager.IsDragging and (Button = mbRight) then
     Exit;
   FileIndex := GetFileIndexFromCursor(X, Y, AtFileList);
@@ -1096,6 +1058,8 @@ begin
         if IsItemValid(AFile) then
         begin
           MainControl.BeginDrag(False);
+          // Restore selection of active file
+          if not AFile.Selected then MarkFile(AFile, True);
         end;
       end;
     end;
@@ -1679,10 +1643,13 @@ end;
 
 procedure TFileViewWithMainCtrl.ShowRenameFileEditInitSelect(Data: PtrInt);
 begin
-  if gRenameSelOnlyName and not (FRenameFile.IsDirectory or FRenameFile.IsLinkToDirectory) then
-     RenameSelectPart(rfatName)
-  else
-     RenameSelectPart(rfatFull);
+  if Assigned(FRenameFile) then
+  begin
+    if gRenameSelOnlyName and not (FRenameFile.IsDirectory or FRenameFile.IsLinkToDirectory) then
+      RenameSelectPart(rfatName)
+    else
+      RenameSelectPart(rfatFull);
+  end;
 end;
 
 procedure TFileViewWithMainCtrl.ShowRenameFileEdit(var AFile: TFile);

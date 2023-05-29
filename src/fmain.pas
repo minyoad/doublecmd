@@ -68,6 +68,7 @@ type
 
   TfrmMain = class(TAloneForm, IFormCommands)
     actAddPlugin: TAction;
+    actSaveFileDetailsToFile: TAction;
     actLoadList: TAction;
     actExtractFiles: TAction;
     actAddPathToCmdLine: TAction;
@@ -773,6 +774,7 @@ type
     procedure AppActivate(Sender: TObject);
     procedure AppDeActivate(Sender: TObject);
     procedure AppEndSession(Sender: TObject);
+    procedure AppThemeChange(Sender: TObject);
     procedure AppQueryEndSession(var Cancel: Boolean);
     procedure AppException(Sender: TObject; E: Exception);
     procedure AppShowHint(var HintStr: string; var CanShow: Boolean; var HintInfo: THintInfo);
@@ -937,7 +939,7 @@ implementation
 {$R *.lfm}
 
 uses
-  uFileProcs, uShellContextMenu, fTreeViewMenu, uSearchResultFileSource,
+  Themes, uFileProcs, uShellContextMenu, fTreeViewMenu, uSearchResultFileSource,
   Math, LCLIntf, Dialogs, uGlobs, uLng, uMasks, fCopyMoveDlg, uQuickViewPanel,
   uShowMsg, uDCUtils, uLog, uGlobsPaths, LCLProc, uOSUtils, uPixMapManager, LazUTF8,
   uDragDropEx, uKeyboard, uFileSystemFileSource, fViewOperations, uMultiListFileSource,
@@ -948,7 +950,7 @@ uses
   Laz2_XMLRead, DCOSUtils, DCStrUtils, fOptions, fOptionsFrame, fOptionsToolbar, uClassesEx,
   uHotDir, uFileSorting, DCBasicTypes, foptionsDirectoryHotlist, uConnectionManager,
   fOptionsToolbarBase, fOptionsToolbarMiddle, fEditor, uColumns, StrUtils, uSysFolders,
-  uColumnsFileView
+  uColumnsFileView, dmHigh
 {$IFDEF MSWINDOWS}
   , uNetworkThread
 {$ENDIF}
@@ -1245,6 +1247,8 @@ begin
   UpdateSelectedDrives;
   UpdateFreeSpace(fpLeft, True);
   UpdateFreeSpace(fpRight, True);
+
+  ThemeServices.OnThemeChange:= @AppThemeChange;
 
 {$IF DEFINED(DARWIN)}
   self.OnActivate:= @FormActivate;
@@ -4342,8 +4346,8 @@ end;
 
 procedure TfrmMain.sboxDrivePaint(Sender: TObject);
 begin
-  PaintDriveFreeBar(Sender, gIndUseGradient, gIndForeColor,
-    gIndThresholdForeColor, gIndBackColor);
+  with gColors.FreeSpaceInd^ do
+    PaintDriveFreeBar(Sender, gIndUseGradient, ForeColor, ThresholdForeColor, BackColor);
 end;
 
 procedure TfrmMain.PaintDriveFreeBar(Sender: TObject; const bIndUseGradient: boolean;
@@ -4410,15 +4414,18 @@ var
 begin
   LogMsgTypeObject := seLogWindow.Lines.Objects[Line-1];
   Special := True;
-  case LogMsgType of
-  lmtInfo:
-    FG := gLogInfoColor;
-  lmtSuccess:
-    FG := gLogSuccessColor;
-  lmtError:
-    FG := gLogErrorColor
-  else
-    FG := clWindowText;
+  with gColors.Log^ do
+  begin
+    case LogMsgType of
+    lmtInfo:
+      FG := InfoColor;
+    lmtSuccess:
+      FG := SuccessColor;
+    lmtError:
+      FG := ErrorColor
+    else
+      FG := clWindowText;
+    end;
   end;
 end;
 
@@ -4808,9 +4815,12 @@ begin
 
   if gSeparateTree then
   begin
-    ShellTreeView.Font.Color := gForeColor;
-    ShellTreeView.BackgroundColor := gBackColor;
-    ShellTreeView.SelectionColor := gCursorColor;
+    with gColors.FilePanel^ do
+    begin
+      ShellTreeView.Font.Color := ForeColor;
+      ShellTreeView.BackgroundColor := BackColor;
+      ShellTreeView.SelectionColor := CursorColor;
+    end;
     FontOptionsToFont(gFonts[dcfMain], ShellTreeView.Font);
   end;
 end;
@@ -6218,8 +6228,7 @@ end;
 
 procedure TfrmMain.NSThemeChangedHandler;
 begin
-  FrameLeft.UpdateColor;
-  FrameRight.UpdateColor;
+  ThemeServices.IntfDoOnThemeChange;
 end;
 {$ENDIF}
 
@@ -7080,6 +7089,24 @@ begin
   frmMainClose(Sender, CloseAction);
 end;
 
+procedure TfrmMain.AppThemeChange(Sender: TObject);
+var
+  Index: Integer;
+begin
+  FrameLeft.UpdateColor;
+  FrameRight.UpdateColor;
+
+  gColorExt.UpdateStyle;
+  gHighlighters.UpdateStyle;
+
+  DCDEbug('AppThemeChange');
+
+  for Index:= 0 to Screen.CustomFormCount - 1 do
+  begin
+    Screen.CustomForms[Index].Perform(CM_THEMECHANGED, 0, 0);
+  end;
+end;
+
 procedure TfrmMain.AppQueryEndSession(var Cancel: Boolean);
 var
   CanClose: Boolean = True;
@@ -7092,14 +7119,20 @@ end;
 function TfrmMain.QObjectEventFilter(Sender: QObjectH; Event: QEventH): Boolean; cdecl;
 begin
   Result:= False;
-  if QEvent_type(Event) = QEventClose then
-  begin
-    TQtWidget(Self.Handle).SlotClose;
-    Result:= CloseQueryResult;
-    if Result then
-      QEvent_accept(Event)
-    else
-      QEvent_ignore(Event);
+  case QEvent_type(Event) of
+    QEventApplicationPaletteChange:
+    begin
+      ThemeServices.IntfDoOnThemeChange;
+    end;
+    QEventClose:
+    begin
+      TQtWidget(Self.Handle).SlotClose;
+      Result:= CloseQueryResult;
+      if Result then
+        QEvent_accept(Event)
+      else
+        QEvent_ignore(Event);
+    end;
   end;
 end;
 {$ENDIF}

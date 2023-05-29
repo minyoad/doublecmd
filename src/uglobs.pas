@@ -45,8 +45,9 @@ uses
   Classes, SysUtils, Controls, Forms, Grids, Types, uExts, uColorExt, Graphics,
   LCLVersion, DCClassesUtf8, uMultiArc, uColumns, uHotkeyManager, uSearchTemplate,
   uFileSourceOperationOptions, uWFXModule, uWCXModule, uWDXModule, uwlxmodule,
-  udsxmodule, DCXmlConfig, uInfoToolTip, fQuickSearch, uTypes, uClassesEx,
-  uHotDir, uSpecialDir, SynEdit, SynEditTypes, uFavoriteTabs, fTreeViewMenu, uConvEncoding;
+  udsxmodule, DCXmlConfig, uInfoToolTip, fQuickSearch, uTypes, uClassesEx, uColors,
+  uHotDir, uSpecialDir, SynEdit, SynEditTypes, uFavoriteTabs, fTreeViewMenu,
+  uConvEncoding, DCJsonConfig;
 
 type
   { Configuration options }
@@ -210,7 +211,10 @@ const
   // 12  - Split Behaviours/HeaderFooterSizeFormat to Behaviours/HeaderSizeFormat and Behaviours/FooterSizeFormat
   //       Loading a config prior of version 11 should ignore that setting and keep default.
   // 13 -  Replace Configuration/UseConfigInProgramDir by doublecmd.inf
-  ConfigVersion = 13;
+  // 14 -  Move some colors to colors.json
+  ConfigVersion = 14;
+
+  COLORS_JSON = 'colors.json';
 
   // Configuration related filenames
   sMULTIARC_FILENAME = 'multiarc.ini';
@@ -247,6 +251,9 @@ var
   gPluginFilenameStyle: TConfigFilenameStyle = pfsAbsolutePath;
   gPluginPathToBeRelativeTo: string = '%COMMANDER_PATH%';
   
+  { Colors }
+  gColors: TColorThemes;
+
   { MultiArc addons }
   gMultiArcList: TMultiArcList;
 
@@ -424,39 +431,14 @@ var
 
   { File panels color page }
   gUseCursorBorder: Boolean;
-  gCursorBorderColor: TColor;
   gUseFrameCursor: Boolean;
-  gForeColor,  //text color
-  gBackColor, //Background color
-  gBackColor2, //Background color 2
-  gMarkColor,  // Mark color
-  gCursorColor, //Cursor color
-  gCursorText,  //text color under cursor
-  gInactiveCursorColor, //Inactive cursor color
-  gInactiveMarkColor: TColor; //Inactive Mark color
   gUseInvertedSelection: Boolean;
   gUseInactiveSelColor: Boolean;
   gAllowOverColor: Boolean;
   gBorderFrameWidth :integer;
 
-  gPathActiveColor,
-  gPathActiveFontColor,
-  gPathInactiveColor,
-  gPathInactiveFontColor: TColor;
-
   gInactivePanelBrightness: Integer; // 0 .. 100 (black .. full color)
   gIndUseGradient : Boolean; // use gradient on drive label
-  gIndForeColor, // foreColor of used space on drive label
-  gIndThresholdForeColor, // foreColor for mote than Threshold of used space on drive label
-  gIndBackColor: TColor; // backColor of free space on drive label
-
-  gLogInfoColor,
-  gLogErrorColor,
-  gLogSuccessColor: TColor;
-
-  gSyncLeftColor,
-  gSyncRightColor,
-  gSyncUnknownColor: TColor;
 
   gShowIcons: TShowIconsMode;
   gShowIconsNew: TShowIconsMode;
@@ -624,8 +606,6 @@ var
   gCopyMovePath3,
   gCopyMovePath4,
   gCopyMovePath5: String;
-  gImageBackColor1,
-  gImageBackColor2: TColor;
   gImagePaintMode: TViewerPaintTool;
   gImagePaintWidth,
   gColCount,
@@ -633,8 +613,6 @@ var
   gMaxTextWidth,
   gTabSpaces : Integer;
   gImagePaintColor,
-  gBookBackgroundColor,
-  gBookFontColor: TColor;
   gTextPosition:PtrInt;
   gPrintMargins: TRect;
   gShowCaret: Boolean;
@@ -659,10 +637,6 @@ var
   gDifferLineDifferences,
   gDifferPaintBackground,
   gDifferIgnoreWhiteSpace: Boolean;
-  gDifferAddedColor: TColor;
-  gDifferDeletedColor: TColor;
-  gDifferModifiedColor: TColor;
-  gDifferModifiedBinaryColor: TColor;
 
   {SyncDirs}
   gSyncDirsSubdirs,
@@ -677,6 +651,7 @@ var
   gSyncDirsShowFilterDuplicates,
   gSyncDirsShowFilterSingles: Boolean;
   gSyncDirsFileMask: string;
+  gSyncDirsFileMaskSave: Boolean;
 
   { Internal Associations}
   gFileAssociationLastCustomAction: string;
@@ -700,18 +675,6 @@ var
   gUseTreeViewMenuWithViewHistory: boolean;
   gUseTreeViewMenuWithCommandLineHistory: boolean;
   gTreeViewMenuUseKeyboardShortcut: boolean;
-  gTVMBackgroundColor: TColor;
-  gTVMShortcutColor: TColor;
-  gTVMNormalTextColor: TColor;
-  gTVMSecondaryTextColor: TColor;
-  gTVMFoundTextColor: TColor;
-  gTVMUnselectableTextColor: TColor;
-  gTVMCursorColor: TColor;
-  gTVMShortcutUnderCursor: TColor;
-  gTVMNormalTextUnderCursor: TColor;
-  gTVMSecondaryTextUnderCursor: TColor;
-  gTVMFoundTextUnderCursor: TColor;
-  gTVMUnselectableUnderCursor: TColor;
   gTreeViewMenuOptions: array [0..(ord(tvmcLASTONE)-2)] of TTreeViewMenuOptions;
   gTreeViewMenuShortcutExit: boolean;
   gTreeViewMenuSingleClickExit: boolean;
@@ -757,13 +720,14 @@ const
   
 var
   gConfig: TXmlConfig = nil;
+  gStyles: TJsonConfig = nil;
 
 implementation
 
 uses
    LCLProc, LCLType, Dialogs, Laz2_XMLRead, LazUTF8, LConvEncoding, uExifWdx,
    uGlobsPaths, uLng, uShowMsg, uFileProcs, uOSUtils, uFindFiles, uEarlyConfig,
-   uDCUtils, fMultiRename, uDCVersion, uDebug, uFileFunctions,
+   dmHigh, uDCUtils, fMultiRename, uDCVersion, uDebug, uFileFunctions,
    uDefaultPlugins, Lua, uKeyboard, DCOSUtils, DCStrUtils, uPixMapManager,
    uSynDiffControls
    {$IF DEFINED(MSWINDOWS)}
@@ -854,6 +818,19 @@ begin
   gConfig.Save;
 end;
 
+procedure SaveColorsConfig;
+begin
+  gColors.Save(gStyles.Root);
+  gColorExt.Save(gStyles.Root);
+  gHighlighters.SaveColors(gStyles.Root);
+  gStyles.SaveToFile(gpCfgDir + COLORS_JSON);
+end;
+
+procedure SaveHighlightersConfig;
+begin
+  gHighlighters.Save(gpCfgDir + HighlighterConfig);
+end;
+
 function AskUserOnError(var ErrorMessage: String): Boolean;
 begin
   // Show error messages.
@@ -884,6 +861,21 @@ end;
 function LoadHotManConfig(var {%H-}ErrorMessage: String): Boolean;
 begin
   HotMan.Load(gpCfgDir + gNameSCFile);
+  Result := True;
+end;
+
+function LoadColorsConfig(var {%H-}ErrorMessage: String): Boolean;
+begin
+  gStyles.LoadFromFile(gpCfgDir + COLORS_JSON);
+  gColors.Load(gStyles.Root);
+  gColorExt.Load(gStyles.Root);
+  gHighlighters.LoadColors(gStyles.Root);
+  Result := True;
+end;
+
+function LoadHighlightersConfig(var {%H-}ErrorMessage: String): Boolean;
+begin
+  gHighlighters.Load(gpCfgDir + HighlighterConfig);
   Result := True;
 end;
 
@@ -1571,6 +1563,8 @@ begin
   gWFXPlugins := TWFXModuleList.Create;
   gWLXPlugins := TWLXModuleList.Create;
   gMultiArcList := TMultiArcList.Create;
+  gColors := TColorThemes.Create;
+  gStyles := TJsonConfig.Create;
   ColSet := TPanelColumnsList.Create;
   HotMan := THotKeyManager.Create;
 end;
@@ -1606,8 +1600,11 @@ begin
   FreeThenNil(gWFXPlugins);
   FreeThenNil(gWLXPlugins);
   FreeThenNil(gMultiArcList);
+  FreeAndNil(gColors);
+  FreeAndNil(gStyles);
   FreeThenNil(ColSet);
   FreeThenNil(HotMan);
+  FreeAndNil(gHighlighters);
 end;
 
 {$IFDEF MSWINDOWS}
@@ -1801,39 +1798,14 @@ begin
 
   { Colors page }
   gUseCursorBorder := False;
-  gCursorBorderColor := clHighlight;
   gUseFrameCursor := False;
-  gForeColor := clWindowText;
-  gBackColor := clWindow;
-  gBackColor2 := clWindow;
-  gMarkColor := clRed;
-  gCursorColor := clHighlight;
-  gCursorText := clHighlightText;
-  gInactiveCursorColor := clInactiveCaption;
-  gInactiveMarkColor := clMaroon;
   gUseInvertedSelection := False;
   gUseInactiveSelColor := False;
   gAllowOverColor := True;
   gBorderFrameWidth:=1;
 
-  gPathActiveColor := clHighlight;
-  gPathActiveFontColor := clHighlightText;
-  gPathInactiveColor := clBtnFace;
-  gPathInactiveFontColor := clBtnText;
-
   gInactivePanelBrightness := 100; // Full brightness
   gIndUseGradient := True;
-  gIndForeColor := clSkyBlue;
-  gIndThresholdForeColor := clRed;
-  gIndBackColor := clWhite;
-
-  gLogInfoColor:= clNavy;
-  gLogErrorColor:= clRed;
-  gLogSuccessColor:= clGreen;
-
-  gSyncLeftColor:= clGreen;
-  gSyncRightColor:= clBlue;
-  gSyncUnknownColor:= clRed;
 
   { Layout page }
   gMainMenu := True;
@@ -2073,15 +2045,11 @@ begin
   gCopyMovePath4 := '';
   gCopyMovePath5 := '';
   gImagePaintMode := vptPen;
-  gImageBackColor1 := clWindow;
-  gImageBackColor2 := clDefault;
   gImagePaintWidth := 5;
   gColCount := 1;
   gTabSpaces := 8;
   gMaxTextWidth := 1024;
   gImagePaintColor := clRed;
-  gBookBackgroundColor := clBlack;
-  gBookFontColor := clWhite;
   gTextPosition:= 0;
   gViewerMode:= 0;
   gShowCaret := False;
@@ -2107,10 +2075,6 @@ begin
   gDifferPaintBackground := True;
   gDifferLineDifferences := False;
   gDifferIgnoreWhiteSpace := False;
-  gDifferAddedColor := clPaleGreen;
-  gDifferDeletedColor := clPaleRed;
-  gDifferModifiedColor := clPaleBlue;
-  gDifferModifiedBinaryColor := clRed;
 
   {SyncDirs}
   gSyncDirsSubdirs := False;
@@ -2125,6 +2089,7 @@ begin
   gSyncDirsShowFilterDuplicates := True;
   gSyncDirsShowFilterSingles := True;
   gSyncDirsFileMask := '*';
+  gSyncDirsFileMaskSave := True;
 
   { Internal Associations}
   gFileAssociationLastCustomAction := rsMsgDefaultCustomActionName;
@@ -2157,18 +2122,6 @@ begin
     gTreeViewMenuOptions[iIndexContextMode].ShowWholeBranchIfMatch := False;
   end;
   gTreeViewMenuUseKeyboardShortcut := True;
-  gTVMBackgroundColor := clForm;
-  gTVMShortcutColor := clRed;
-  gTVMNormalTextColor := clWindowText;
-  gTVMSecondaryTextColor := clWindowFrame;
-  gTVMFoundTextColor := clHighLight;
-  gTVMUnselectableTextColor := clGrayText;
-  gTVMCursorColor := clHighlight;
-  gTVMShortcutUnderCursor := clHighlightText;
-  gTVMNormalTextUnderCursor := clHighlightText;
-  gTVMSecondaryTextUnderCursor := clBtnHighlight;
-  gTVMFoundTextUnderCursor := clYellow;
-  gTVMUnselectableUnderCursor := clGrayText;
 
   { - Other - }
   gGoToRoot := False;
@@ -2426,6 +2379,19 @@ begin
   end;
   LoadStringsFromFile(glsIgnoreList, ReplaceEnvVars(gIgnoreListFile));
 
+  { Localization }
+  msgLoadLng;
+
+  if (gHighlighters = nil) then
+  begin
+    // Must be after msgLoadLng and before LoadColorsConfig
+    gHighlighters := THighlighters.Create;
+  end;
+
+  { Highlighters }
+  if mbFileExists(gpCfgDir + HighlighterConfig) then
+    LoadConfigCheckErrors(@LoadHighlightersConfig, gpCfgDir + HighlighterConfig, ErrorMessage);
+
   { Hotkeys }
   if not mbFileExists(gpCfgDir + gNameSCFile) then
     gNameSCFile := 'shortcuts.scf';
@@ -2435,6 +2401,11 @@ begin
        mbRenameFile(gpCfgDir + 'shortcuts.ini', gpCfgDir + gNameSCFile);
   LoadConfigCheckErrors(@LoadHotManConfig, gpCfgDir + gNameSCFile, ErrorMessage);
 
+  { Colors }
+  gColors.LoadFromXml(gConfig);
+  if mbFileExists(gpCfgDir + COLORS_JSON) then
+    LoadConfigCheckErrors(@LoadColorsConfig, gpCfgDir + COLORS_JSON, ErrorMessage);
+
   { MultiArc addons }
   if mbFileExists(gpCfgDir + sMULTIARC_FILENAME) then
     LoadConfigCheckErrors(@LoadMultiArcConfig, gpCfgDir + sMULTIARC_FILENAME, ErrorMessage);
@@ -2442,9 +2413,6 @@ begin
   { Various history }
   if mbFileExists(gpCfgDir + 'history.xml') then
     LoadConfigCheckErrors(@LoadHistoryConfig, gpCfgDir + 'history.xml', ErrorMessage);
-
-  { Localization }
-  msgLoadLng;
 
   FillFileFuncList;
 
@@ -2482,7 +2450,9 @@ begin
     SaveWithCheck(@SaveEarlyConfig, 'early config', ErrMsg);
     SaveWithCheck(@SaveCfgIgnoreList, 'ignore list', ErrMsg);
     SaveWithCheck(@SaveCfgMainConfig, 'main configuration', ErrMsg);
+    SaveWithCheck(@SaveHighlightersConfig, 'highlighters config', ErrMsg);
     SaveWithCheck(@SaveHistoryConfig, 'various history', ErrMsg);
+    SaveWithCheck(@SaveColorsConfig, 'color themes', ErrMsg);
 
     if ErrMsg <> EmptyStr then
       DebugLn(ErrMsg);
@@ -2769,35 +2739,14 @@ begin
     if Assigned(Node) then
     begin
       gUseCursorBorder := GetValue(Node, 'UseCursorBorder', gUseCursorBorder);
-      gCursorBorderColor := GetValue(Node, 'CursorBorderColor', gCursorBorderColor);
       gUseFrameCursor := GetValue(Node, 'UseFrameCursor', gUseFrameCursor);
-      gForeColor := GetValue(Node, 'Foreground', gForeColor);
-      gBackColor := GetValue(Node, 'Background', gBackColor);
-      gBackColor2 := GetValue(Node, 'Background2', gBackColor2);
-      gMarkColor := GetValue(Node, 'Mark', gMarkColor);
-      gCursorColor := GetValue(Node, 'Cursor', gCursorColor);
-      gCursorText := GetValue(Node, 'CursorText', gCursorText);
-      gInactiveCursorColor := GetValue(Node, 'InactiveCursor', gInactiveCursorColor);
-      gInactiveMarkColor := GetValue(Node, 'InactiveMark', gInactiveMarkColor);
       gUseInvertedSelection := GetValue(Node, 'UseInvertedSelection', gUseInvertedSelection);
       gUseInactiveSelColor := GetValue(Node, 'UseInactiveSelColor', gUseInactiveSelColor);
       gAllowOverColor   := GetValue(Node, 'AllowOverColor', gAllowOverColor);
       gBorderFrameWidth := GetValue(Node, 'gBorderFrameWidth', gBorderFrameWidth);
 
-      gPathActiveColor := GetValue(Node, 'PathLabel/ActiveColor', gPathActiveColor);
-      gPathActiveFontColor := GetValue(Node, 'PathLabel/ActiveFontColor', gPathActiveFontColor);
-      gPathInactiveColor := GetValue(Node, 'PathLabel/InactiveColor', gPathInactiveColor);
-      gPathInactiveFontColor := GetValue(Node, 'PathLabel/InactiveFontColor', gPathInactiveFontColor);
-
       gInactivePanelBrightness := GetValue(Node, 'InactivePanelBrightness', gInactivePanelBrightness);
       gIndUseGradient := GetValue(Node, 'FreeSpaceIndicator/UseGradient', gIndUseGradient);
-      gIndForeColor := GetValue(Node, 'FreeSpaceIndicator/ForeColor', gIndForeColor);
-      gIndThresholdForeColor := GetValue(Node, 'FreeSpaceIndicator/ThresholdForeColor', gIndThresholdForeColor);
-      gIndBackColor := GetValue(Node, 'FreeSpaceIndicator/BackColor', gIndBackColor);
-
-      gLogInfoColor:= GetValue(Node, 'LogWindow/Info', gLogInfoColor);
-      gLogErrorColor:= GetValue(Node, 'LogWindow/Error', gLogErrorColor);
-      gLogSuccessColor:= GetValue(Node, 'LogWindow/Success', gLogSuccessColor);
     end;
 
     { ToolTips page }
@@ -3179,8 +3128,6 @@ begin
       gImageStretchOnlyLarge := GetValue(Node, 'ImageStretchLargeOnly', gImageStretchOnlyLarge);
       gImageShowTransparency := GetValue(Node, 'ImageShowTransparency', gImageShowTransparency);
       gImageCenter := GetValue(Node, 'ImageCenter', gImageCenter);
-      gImageBackColor1:= GetValue(Node, 'ImageBackColor1', gImageBackColor1);
-      gImageBackColor2:= GetValue(Node, 'ImageBackColor2', gImageBackColor2);
       gPreviewVisible := GetValue(Node, 'PreviewVisible', gPreviewVisible);
       gCopyMovePath1 := GetValue(Node, 'CopyMovePath1', gCopyMovePath1);
       gCopyMovePath2 := GetValue(Node, 'CopyMovePath2', gCopyMovePath2);
@@ -3199,8 +3146,6 @@ begin
       gViewerLeftMargin := GetValue(Node, 'LeftMargin' , gViewerLeftMargin);
       gViewerLineSpacing := GetValue(Node, 'ExtraLineSpan' , gViewerLineSpacing);
       gImagePaintColor := GetValue(Node, 'PaintColor', gImagePaintColor);
-      gBookBackgroundColor := GetValue(Node, 'BackgroundColor', gBookBackgroundColor);
-      gBookFontColor := GetValue(Node, 'FontColor', gBookFontColor);
       gTextPosition := GetValue(Node, 'TextPosition',  gTextPosition);
       gViewerAutoCopy := GetValue(Node, 'AutoCopy',  gViewerAutoCopy);
       gViewerSynEditMask := GetValue(Node, 'SynEditMask', gViewerSynEditMask);
@@ -3232,18 +3177,7 @@ begin
       gDifferPaintBackground := GetValue(Node, 'PaintBackground', gDifferPaintBackground);
       gDifferLineDifferences := GetValue(Node, 'LineDifferences', gDifferLineDifferences);
       gDifferIgnoreWhiteSpace := GetValue(Node, 'IgnoreWhiteSpace', gDifferIgnoreWhiteSpace);
-      SubNode := FindNode(Node, 'Colors');
-      if Assigned(SubNode) then
-      begin
-        gDifferAddedColor := GetValue(SubNode, 'Added', gDifferAddedColor);
-        gDifferDeletedColor := GetValue(SubNode, 'Deleted', gDifferDeletedColor);
-        gDifferModifiedColor := GetValue(SubNode, 'Modified', gDifferModifiedColor);
-        SubNode := FindNode(Node, 'Colors/Binary');
-        if Assigned(SubNode) then begin
-          gDifferModifiedBinaryColor := GetValue(SubNode, 'Modified', gDifferModifiedBinaryColor);
-        end;
       end;
-    end;
 
     { SyncDirs }
     Node := Root.FindNode('SyncDirs');
@@ -3261,13 +3195,7 @@ begin
       gSyncDirsShowFilterDuplicates := GetValue(Node, 'FilterDuplicates', gSyncDirsShowFilterDuplicates);
       gSyncDirsShowFilterSingles := GetValue(Node, 'FilterSingles', gSyncDirsShowFilterSingles);
       gSyncDirsFileMask := GetValue(Node, 'FileMask', gSyncDirsFileMask);
-      SubNode := FindNode(Node, 'Colors');
-      if Assigned(SubNode) then
-      begin
-        gSyncLeftColor := GetValue(SubNode, 'Left', gSyncLeftColor);
-        gSyncRightColor := GetValue(SubNode, 'Right', gSyncRightColor);
-        gSyncUnknownColor := GetValue(SubNode, 'Unknown', gSyncUnknownColor);
-      end;
+      gSyncDirsFileMaskSave := GetAttr(Node, 'FileMask/Save', gSyncDirsFileMaskSave);
     end;
 
     { Internal Associations}
@@ -3309,18 +3237,6 @@ begin
         gTreeViewMenuOptions[iIndexContextMode].ShowWholeBranchIfMatch := GetValue(SubNode, 'ShowWholeBranchIfMatch', gTreeViewMenuOptions[iIndexContextMode].ShowWholeBranchIfMatch);
       end;
       gTreeViewMenuUseKeyboardShortcut := GetValue(Node, 'TreeViewMenuUseKeyboardShortcut', gTreeViewMenuUseKeyboardShortcut);
-      gTVMBackgroundColor := GetValue(Node, 'BackgroundColor', gTVMBackgroundColor);
-      gTVMShortcutColor := GetValue(Node, 'ShortcutColor', gTVMShortcutColor);
-      gTVMNormalTextColor := GetValue(Node, 'NormalTextColor', gTVMNormalTextColor);
-      gTVMSecondaryTextColor := GetValue(Node, 'SecondaryTextColor', gTVMSecondaryTextColor);
-      gTVMFoundTextColor := GetValue(Node, 'FoundTextColor', gTVMFoundTextColor);
-      gTVMUnselectableTextColor := GetValue(Node, 'UnselectableTextColor', gTVMUnselectableTextColor);
-      gTVMCursorColor := GetValue(Node, 'CursorColor', gTVMCursorColor);
-      gTVMShortcutUnderCursor := GetValue(Node, 'ShortcutUnderCursor', gTVMShortcutUnderCursor);
-      gTVMNormalTextUnderCursor := GetValue(Node, 'NormalTextUnderCursor', gTVMNormalTextUnderCursor);
-      gTVMSecondaryTextUnderCursor := GetValue(Node, 'SecondaryTextUnderCursor', gTVMSecondaryTextUnderCursor);
-      gTVMFoundTextUnderCursor := GetValue(Node, 'FoundTextUnderCursor', gTVMFoundTextUnderCursor);
-      gTVMUnselectableUnderCursor := GetValue(Node, 'UnselectableUnderCursor', gTVMUnselectableUnderCursor);
     end;
 
     { Favorite Tabs }
@@ -3521,35 +3437,13 @@ begin
     { Colors page }
     Node := FindNode(Root, 'Colors', True);
     SetValue(Node, 'UseCursorBorder', gUseCursorBorder);
-    SetValue(Node, 'CursorBorderColor', gCursorBorderColor);
     SetValue(Node, 'UseFrameCursor', gUseFrameCursor);
-    SetValue(Node, 'Foreground', gForeColor);
-    SetValue(Node, 'Background', gBackColor);
-    SetValue(Node, 'Background2', gBackColor2);
-    SetValue(Node, 'Cursor', gCursorColor);
-    SetValue(Node, 'CursorText', gCursorText);
-    SetValue(Node, 'Mark', gMarkColor);
-    SetValue(Node, 'InactiveCursor', gInactiveCursorColor);
-    SetValue(Node, 'InactiveMark', gInactiveMarkColor);
     SetValue(Node, 'UseInvertedSelection', gUseInvertedSelection);
     SetValue(Node, 'UseInactiveSelColor', gUseInactiveSelColor);
     SetValue(Node, 'AllowOverColor', gAllowOverColor);
     SetValue(Node, 'gBorderFrameWidth', gBorderFrameWidth);
-
-    SetValue(Node, 'PathLabel/ActiveColor', gPathActiveColor);
-    SetValue(Node, 'PathLabel/ActiveFontColor', gPathActiveFontColor);
-    SetValue(Node, 'PathLabel/InactiveColor', gPathInactiveColor);
-    SetValue(Node, 'PathLabel/InactiveFontColor', gPathInactiveFontColor);
-
     SetValue(Node, 'InactivePanelBrightness', gInactivePanelBrightness);
     SetValue(Node, 'FreeSpaceIndicator/UseGradient', gIndUseGradient);
-    SetValue(Node, 'FreeSpaceIndicator/ForeColor', gIndForeColor);
-    SetValue(Node, 'FreeSpaceIndicator/ThresholdForeColor', gIndThresholdForeColor);
-    SetValue(Node, 'FreeSpaceIndicator/BackColor', gIndBackColor);
-
-    SetValue(Node, 'LogWindow/Info', gLogInfoColor);
-    SetValue(Node, 'LogWindow/Error', gLogErrorColor);
-    SetValue(Node, 'LogWindow/Success', gLogSuccessColor);
 
     gColorExt.Save(gConfig, Node);
 
@@ -3820,8 +3714,6 @@ begin
     SetValue(Node, 'ImageStretchLargeOnly', gImageStretchOnlyLarge);
     SetValue(Node, 'ImageShowTransparency', gImageShowTransparency);
     SetValue(Node, 'ImageCenter', gImageCenter);
-    SetValue(Node, 'ImageBackColor1', gImageBackColor1);
-    SetValue(Node, 'ImageBackColor2', gImageBackColor2);
     SetValue(Node, 'CopyMovePath1', gCopyMovePath1);
     SetValue(Node, 'CopyMovePath2', gCopyMovePath2);
     SetValue(Node, 'CopyMovePath3', gCopyMovePath3);
@@ -3840,8 +3732,6 @@ begin
     SetValue(Node, 'ExtraLineSpan' , gViewerLineSpacing);
 
     SetValue(Node, 'PaintColor', gImagePaintColor);
-    SetValue(Node, 'BackgroundColor', gBookBackgroundColor);
-    SetValue(Node, 'FontColor', gBookFontColor);
     SetValue(Node, 'TextPosition', gTextPosition);
     SetValue(Node, 'AutoCopy', gViewerAutoCopy);
     SetValue(Node, 'SynEditMask', gViewerSynEditMask);
@@ -3863,12 +3753,6 @@ begin
     SetValue(Node, 'PaintBackground', gDifferPaintBackground);
     SetValue(Node, 'LineDifferences', gDifferLineDifferences);
     SetValue(Node, 'IgnoreWhiteSpace', gDifferIgnoreWhiteSpace);
-    SubNode := FindNode(Node, 'Colors', True);
-    SetValue(SubNode, 'Added', gDifferAddedColor);
-    SetValue(SubNode, 'Deleted', gDifferDeletedColor);
-    SetValue(SubNode, 'Modified', gDifferModifiedColor);
-    SubNode := FindNode(Node, 'Colors/Binary', True);
-    SetValue(SubNode, 'Modified', gDifferModifiedBinaryColor);
 
     { SyncDirs }
     Node := FindNode(Root, 'SyncDirs', True);
@@ -3884,10 +3768,7 @@ begin
     SetValue(Node, 'FilterDuplicates', gSyncDirsShowFilterDuplicates);
     SetValue(Node, 'FilterSingles', gSyncDirsShowFilterSingles);
     SetValue(Node, 'FileMask', gSyncDirsFileMask);
-    SubNode := FindNode(Node, 'Colors', True);
-    SetValue(SubNode, 'Left', gSyncLeftColor);
-    SetValue(SubNode, 'Right', gSyncRightColor);
-    SetValue(SubNode, 'Unknown', gSyncUnknownColor);
+    SetAttr(Node, 'FileMask/Save', gSyncDirsFileMaskSave);
 
     { Internal Associations}
     Node := FindNode(Root, 'InternalAssociations', True);
@@ -3923,18 +3804,6 @@ begin
       SetValue(SubNode, 'ShowWholeBranchIfMatch', gTreeViewMenuOptions[iIndexContextMode].ShowWholeBranchIfMatch);
     end;
     SetValue(Node, 'TreeViewMenuUseKeyboardShortcut', gTreeViewMenuUseKeyboardShortcut);
-    SetValue(Node, 'BackgroundColor', gTVMBackgroundColor);
-    SetValue(Node, 'ShortcutColor', gTVMShortcutColor);
-    SetValue(Node, 'NormalTextColor', gTVMNormalTextColor);
-    SetValue(Node, 'SecondaryTextColor', gTVMSecondaryTextColor);
-    SetValue(Node, 'FoundTextColor', gTVMFoundTextColor);
-    SetValue(Node, 'UnselectableTextColor', gTVMUnselectableTextColor);
-    SetValue(Node, 'CursorColor', gTVMCursorColor);
-    SetValue(Node, 'ShortcutUnderCursor', gTVMShortcutUnderCursor);
-    SetValue(Node, 'NormalTextUnderCursor', gTVMNormalTextUnderCursor);
-    SetValue(Node, 'SecondaryTextUnderCursor', gTVMSecondaryTextUnderCursor);
-    SetValue(Node, 'FoundTextUnderCursor', gTVMFoundTextUnderCursor);
-    SetValue(Node,'UnselectableUnderCursor', gTVMUnselectableUnderCursor);
 
     { Favorite Tabs }
     Node := FindNode(Root, 'FavoriteTabsOptions', True);

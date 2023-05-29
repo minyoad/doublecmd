@@ -169,6 +169,7 @@ type
    procedure cm_ContextMenu(const Params: array of string);
    procedure cm_CopyFullNamesToClip(const {%H-}Params: array of string);
    procedure cm_CopyFileDetailsToClip(const {%H-}Params: array of string);
+   procedure cm_SaveFileDetailsToFile(const {%H-}Params: array of string);
    procedure cm_Exchange(const {%H-}Params: array of string);
    procedure cm_FlatView(const {%H-}Params: array of string);
    procedure cm_FlatViewSel(const {%H-}Params: array of string);
@@ -1046,6 +1047,11 @@ procedure TMainCommands.cm_ContextMenu(const Params: array of string);
 begin
   // Let file view handle displaying context menu at appropriate position.
   frmMain.ActiveFrame.ExecuteCommand('cm_ContextMenu', Params);
+end;
+
+procedure TMainCommands.cm_SaveFileDetailsToFile(const Params: array of string);
+begin
+  frmMain.ActiveFrame.ExecuteCommand('cm_SaveFileDetailsToFile', []);
 end;
 
 procedure TMainCommands.cm_CopyFullNamesToClip(const Params: array of string);
@@ -3940,9 +3946,9 @@ var
   ActiveFile: TFile = nil;
   SelectedFiles: TFiles = nil;
   aFileProperties: TFileProperties;
-  CreationTime: DCBasicTypes.TFileTime = 0;
-  LastAccessTime : DCBasicTypes.TFileTime = 0;
-  ModificationTime: DCBasicTypes.TFileTime = 0;
+  CreationTime: DCBasicTypes.TFileTimeEx;
+  LastAccessTime : DCBasicTypes.TFileTimeEx;
+  ModificationTime: DCBasicTypes.TFileTimeEx;
   Operation: TFileSourceSetFilePropertyOperation = nil;
 
 begin
@@ -3963,11 +3969,11 @@ begin
           if mbFileGetTime(ActiveFile.FullPath, ModificationTime, CreationTime, LastAccessTime) then
           begin
             if fpModificationTime in ActiveFile.SupportedProperties then
-              ActiveFile.ModificationTime:= FileTimeToDateTime(ModificationTime);
+              ActiveFile.ModificationTime:= FileTimeToDateTimeEx(ModificationTime);
             if fpCreationTime in ActiveFile.SupportedProperties then
-              ActiveFile.CreationTime:= FileTimeToDateTime(CreationTime);
+              ActiveFile.CreationTime:= FileTimeToDateTimeEx(CreationTime);
             if fpLastAccessTime in ActiveFile.SupportedProperties then
-              ActiveFile.LastAccessTime:= FileTimeToDateTime(LastAccessTime);
+              ActiveFile.LastAccessTime:= FileTimeToDateTimeEx(LastAccessTime);
           end;
         end;
         FillByte(aFileProperties, SizeOf(aFileProperties), 0);

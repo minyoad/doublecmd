@@ -28,12 +28,13 @@
 unit DCUnix;
 
 {$mode objfpc}{$H+}
+{$modeswitch advancedrecords}
 {$packrecords c}
 
 interface
 
 uses
-  InitC, BaseUnix, UnixType, SysUtils;
+  InitC, BaseUnix, UnixType, DCBasicTypes, SysUtils;
 
 const
 {$IF DEFINED(LINUX)}
@@ -155,7 +156,21 @@ type
   TDCStat = BaseUnix.Stat;
 {$ENDIF}
 
+  TDCStatHelper = record Helper for TDCStat
+  Public
+    function birthtime: TFileTimeEx; inline;
+    function mtime:     TFileTimeEx; inline;
+    function atime:     TFileTimeEx; inline;
+    function ctime:     TFileTimeEx; inline;
+  end;
+
 Function DC_fpLstat( const path:RawByteString; var Info:TDCStat ): cint; inline;
+
+// nanoseconds supported
+function DC_FileSetTime(const FileName: String;
+                        const mtime    : TFileTimeEx;
+                        const birthtime: TFileTimeEx;
+                        const atime    : TFileTimeEx ): Boolean;
 
 
 {en
@@ -249,7 +264,60 @@ function fnmatch(const pattern: PAnsiChar; const str: PAnsiChar; flags: cint): c
 implementation
 
 uses
-  Unix, DCConvertEncoding;
+  Unix, DCConvertEncoding, LazUTF8
+{$IFDEF DARWIN}
+  , DCDarwin
+{$ENDIF}
+  ;
+
+{$IF not DEFINED(LINUX)}
+function TDCStatHelper.birthtime: TFileTimeEx;
+begin
+  Result.sec:= st_birthtime;
+  Result.nanosec:= st_birthtimensec;
+end;
+
+function TDCStatHelper.mtime: TFileTimeEx;
+begin
+  Result.sec:= st_mtime;
+  Result.nanosec:= st_mtimensec;
+end;
+
+function TDCStatHelper.atime: TFileTimeEx;
+begin
+  Result.sec:= st_atime;
+  Result.nanosec:= st_atimensec;
+end;
+
+function TDCStatHelper.ctime: TFileTimeEx;
+begin
+  Result.sec:= st_ctime;
+  Result.nanosec:= st_ctimensec;
+end;
+{$ELSE}
+function TDCStatHelper.birthtime: TFileTimeEx;
+begin
+  Result:= TFileTimeExNull;
+end;
+
+function TDCStatHelper.mtime: TFileTimeEx;
+begin
+  Result.sec:= st_mtime;
+  Result.nanosec:= st_mtime_nsec;
+end;
+
+function TDCStatHelper.atime: TFileTimeEx;
+begin
+  Result.sec:= st_atime;
+  Result.nanosec:= st_atime_nsec;
+end;
+
+function TDCStatHelper.ctime: TFileTimeEx;
+begin
+  Result.sec:= st_ctime;
+  Result.nanosec:= st_ctime_nsec;
+end;
+{$ENDIF}
 
 
 {$IF DEFINED(DARWIN)}
@@ -272,6 +340,32 @@ begin
 end;
 
 {$ENDIF}
+
+function fputimes( path:pchar; times:Array of UnixType.timeval ): cint; cdecl; external clib name 'utimes';
+
+function DC_FileSetTime(const FileName: String;
+                        const mtime    : TFileTimeEx;
+                        const birthtime: TFileTimeEx;
+                        const atime    : TFileTimeEx ): Boolean;
+var
+  timevals: Array[0..1] of UnixType.timeval;
+begin
+  Result:= false;
+
+  // last access time
+  timevals[0].tv_sec:= atime.sec;
+  timevals[0].tv_usec:= round( Extended(atime.nanosec) / 1000.0 );
+  // last modification time
+  timevals[1].tv_sec:= mtime.sec;
+  timevals[1].tv_usec:= round( Extended(mtime.nanosec) / 1000.0 );
+  if fputimes(pchar(UTF8ToSys(FileName)), timevals) <> 0 then exit;
+
+  {$IF not DEFINED(DARWIN)}
+  Result:= true;
+  {$ELSE}
+  Result:= MacosFileSetCreationTime( FileName, birthtime );
+  {$ENDIF}
+end;
 
 
 

@@ -9,14 +9,15 @@ rem Path to Inno Setup compiler
 set ISCC_EXE="%ProgramFiles(x86)%\Inno Setup 5\ISCC.exe"
 
 rem The new package will be created from here
-set BUILD_PACK_DIR=%TEMP%\doublecmd-%DATE: =%
+set date=%Date:~0,4%%Date:~5,2%%Date:~8,2%%Time:~0,2%%Time:~3,2%%Time:~6,2%
+set BUILD_PACK_DIR=%TEMP%\doublecmd-%date%
 
 rem The new package will be saved here
 set PACK_DIR=%CD%\windows\release
 
 rem Create temp dir for building
 set BUILD_DC_TMP_DIR=%TEMP%\doublecmd-%DC_VER%
-rm -rf %BUILD_DC_TMP_DIR%
+rmdir /s /q %BUILD_DC_TMP_DIR%
 mkdir %BUILD_DC_TMP_DIR%
 %GIT_EXE% -C ..\ checkout-index -a -f --prefix=%BUILD_DC_TMP_DIR%\
 
@@ -34,19 +35,19 @@ if "%CPU_TARGET%" == "" (
 rem Save revision number
 set OUT=..\units\%CPU_TARGET%-%OS_TARGET%-win32
 call ..\src\platform\git2revisioninc.exe.cmd %OUT%
-copy %OUT%\dcrevision.inc %BUILD_DC_TMP_DIR%\units\
+copy /Y  %OUT%\dcrevision.inc %BUILD_DC_TMP_DIR%\units\
 
 rem Prepare package build dir
-rm -rf %BUILD_PACK_DIR%
+rmdir /s /q %BUILD_PACK_DIR%
 mkdir %BUILD_PACK_DIR%
 mkdir %BUILD_PACK_DIR%\release
 
-rem Copy needed files
-copy windows\doublecmd.iss %BUILD_PACK_DIR%\
+rem copy /Y  needed files
+copy /Y  windows\doublecmd.iss %BUILD_PACK_DIR%\
 
-rem Copy libraries
-copy windows\lib\%CPU_TARGET%\*.dll             %BUILD_DC_TMP_DIR%\
-copy windows\lib\%CPU_TARGET%\winpty-agent.exe  %BUILD_DC_TMP_DIR%\
+rem copy /Y  libraries
+copy /Y  windows\lib\%CPU_TARGET%\*.dll             %BUILD_DC_TMP_DIR%\
+copy /Y  windows\lib\%CPU_TARGET%\winpty-agent.exe  %BUILD_DC_TMP_DIR%\
 
 cd /D %BUILD_DC_TMP_DIR%
 
@@ -61,13 +62,13 @@ rem Create *.exe package
 %ISCC_EXE% /F"doublecmd-%DC_VER%.%CPU_TARGET%-%OS_TARGET%" /DDisplayVersion=%DC_VER% doublecmd.iss
 
 rem Move created package
-move release\*.exe %PACK_DIR%
+copy /Y  release\*.exe %PACK_DIR%
 
 rem Create *.zip package
-copy NUL doublecmd\doublecmd.inf
+copy /Y  NUL doublecmd\doublecmd.inf
 zip -9 -Dr %PACK_DIR%\doublecmd-%DC_VER%.%CPU_TARGET%-%OS_TARGET%.zip doublecmd
 
 rem Clean temp directories
 cd \
-rm -rf %BUILD_DC_TMP_DIR%
-rm -rf %BUILD_PACK_DIR%
+rmdir /s /q %BUILD_DC_TMP_DIR%
+rmdir /s /q %BUILD_PACK_DIR%

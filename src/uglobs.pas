@@ -621,6 +621,7 @@ var
   gViewerLineSpacing: Integer;
   gViewerAutoCopy: Boolean;
   gViewerSynEditMask: String;
+  gViewerJpegQuality: Integer;
 
   { Editor }
   gEditWaitTime: Integer;
@@ -1571,39 +1572,39 @@ end;
 
 procedure DestroyGlobs;
 begin
-  FreeThenNil(gColorExt);
-  FreeThenNil(gFileInfoToolTip);
-  FreeThenNil(glsDirHistory);
-  FreeThenNil(glsCmdLineHistory);
+  FreeAndNil(gColorExt);
+  FreeAndNil(gFileInfoToolTip);
+  FreeAndNil(glsDirHistory);
+  FreeAndNil(glsCmdLineHistory);
   FreeAndNil(glsVolumeSizeHistory);
-  FreeThenNil(gSpecialDirList);
-  FreeThenNil(gDirectoryHotlist);
-  FreeThenNil(gFavoriteTabsList);
-  FreeThenNil(glsMaskHistory);
-  FreeThenNil(glsSearchHistory);
-  FreeThenNil(glsSearchPathHistory);
-  FreeThenNil(glsReplaceHistory);
-  FreeThenNil(glsReplacePathHistory);
+  FreeAndNil(gSpecialDirList);
+  FreeAndNil(gDirectoryHotlist);
+  FreeAndNil(gFavoriteTabsList);
+  FreeAndNil(glsMaskHistory);
+  FreeAndNil(glsSearchHistory);
+  FreeAndNil(glsSearchPathHistory);
+  FreeAndNil(glsReplaceHistory);
+  FreeAndNil(glsReplacePathHistory);
   FreeAndNil(glsCreateDirectoriesHistory);
   FreeAndNil(glsRenameNameMaskHistory);
   FreeAndNil(glsRenameExtMaskHistory);
-  FreeThenNil(glsIgnoreList);
-  FreeThenNil(glsSearchDirectories);
-  FreeThenNil(glsSearchExcludeFiles);
-  FreeThenNil(glsSearchExcludeDirectories);
-  FreeThenNil(gExts);
-  FreeThenNil(gConfig);
-  FreeThenNil(gSearchTemplateList);
-  FreeThenNil(gDSXPlugins);
-  FreeThenNil(gWCXPlugins);
-  FreeThenNil(gWDXPlugins);
-  FreeThenNil(gWFXPlugins);
-  FreeThenNil(gWLXPlugins);
-  FreeThenNil(gMultiArcList);
+  FreeAndNil(glsIgnoreList);
+  FreeAndNil(glsSearchDirectories);
+  FreeAndNil(glsSearchExcludeFiles);
+  FreeAndNil(glsSearchExcludeDirectories);
+  FreeAndNil(gExts);
+  FreeAndNil(gConfig);
+  FreeAndNil(gSearchTemplateList);
+  FreeAndNil(gDSXPlugins);
+  FreeAndNil(gWCXPlugins);
+  FreeAndNil(gWDXPlugins);
+  FreeAndNil(gWFXPlugins);
+  FreeAndNil(gWLXPlugins);
+  FreeAndNil(gMultiArcList);
   FreeAndNil(gColors);
   FreeAndNil(gStyles);
-  FreeThenNil(ColSet);
-  FreeThenNil(HotMan);
+  FreeAndNil(ColSet);
+  FreeAndNil(HotMan);
   FreeAndNil(gHighlighters);
 end;
 
@@ -2059,6 +2060,7 @@ begin
   gPrintMargins:= Classes.Rect(200, 200, 200, 200);
   gViewerAutoCopy := True;
   gViewerSynEditMask := AllFilesMask;
+  gViewerJpegQuality := 80;
 
   { Editor }
   gEditWaitTime := 2000;
@@ -3149,6 +3151,7 @@ begin
       gTextPosition := GetValue(Node, 'TextPosition',  gTextPosition);
       gViewerAutoCopy := GetValue(Node, 'AutoCopy',  gViewerAutoCopy);
       gViewerSynEditMask := GetValue(Node, 'SynEditMask', gViewerSynEditMask);
+      gViewerJpegQuality := GetValue(Node, 'JpegQuality', gViewerJpegQuality);
       if LoadedConfigVersion < 7 then
       begin
         gThumbSave := GetValue(Node, 'SaveThumbnails', gThumbSave);
@@ -3735,6 +3738,7 @@ begin
     SetValue(Node, 'TextPosition', gTextPosition);
     SetValue(Node, 'AutoCopy', gViewerAutoCopy);
     SetValue(Node, 'SynEditMask', gViewerSynEditMask);
+    SetValue(Node, 'JpegQuality', gViewerJpegQuality);
 
     { Editor }
     Node := FindNode(Root, 'Editor',True);

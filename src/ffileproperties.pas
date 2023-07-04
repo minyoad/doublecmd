@@ -210,11 +210,11 @@ begin
     ActiveFile.OwnerProperty.Owner:= FFileAttr.FindData.st_uid;
 {$ENDIF}
     if fpModificationTime in ActiveFile.SupportedProperties then
-      ActiveFile.ModificationTime:= FileTimeToDateTime(FFileAttr.LastWriteTime);
+      ActiveFile.ModificationTime:= FileTimeToDateTime(DCBasicTypes.TFileTime(FFileAttr.LastWriteTime));
     if fpChangeTime in ActiveFile.SupportedProperties then
-      ActiveFile.ChangeTime:= FileTimeToDateTime(FFileAttr.PlatformTime);
+      ActiveFile.ChangeTime:= FileTimeToDateTime(DCBasicTypes.TFileTime(FFileAttr.PlatformTime));
     if fpLastAccessTime in ActiveFile.SupportedProperties then
-      ActiveFile.LastAccessTime:= FileTimeToDateTime(FFileAttr.LastAccessTime);
+      ActiveFile.LastAccessTime:= FileTimeToDateTime(DCBasicTypes.TFileTime(FFileAttr.LastAccessTime));
   end;
 
   if (fsoSetFileProperty in aFileSource.GetOperationsTypes) then
@@ -766,8 +766,8 @@ begin
       begin
         if (OriginalUser <> cbxUsers.Text) or (OriginalGroup <> cbxGroups.Text) then
         begin
-          TFileOwnerProperty(theNewProperties[fpOwner]).Group:= StrToUID(cbxUsers.Text);
-          TFileOwnerProperty(theNewProperties[fpOwner]).Owner:= StrToGID(cbxGroups.Text);
+          TFileOwnerProperty(theNewProperties[fpOwner]).Owner:= StrToUID(cbxUsers.Text);
+          TFileOwnerProperty(theNewProperties[fpOwner]).Group:= StrToGID(cbxGroups.Text);
         end
         // Nothing changed, clear new property
         else begin

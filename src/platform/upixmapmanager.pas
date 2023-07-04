@@ -45,7 +45,9 @@ uses
   Classes, SysUtils, Graphics, syncobjs, uFileSorting, DCStringHashListUtf8,
   uFile, uIconTheme, uDrive, uDisplayFile, uGlobs, uDCReadPSD, uOSUtils,
   uVectorImage
-  {$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
+  {$IF DEFINED(MSWINDOWS)}
+  , ShlObj
+  {$ELSEIF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
   , fgl
   {$ELSEIF DEFINED(UNIX)}
   , DCFileAttributes
@@ -188,6 +190,7 @@ type
   {$ENDIF}
 
   {$IF DEFINED(WINDOWS)}
+    function GetShellFolderIcon(AFile: TFile): PtrInt;
     {en
        Checks if the AIconName points to an icon resource in a library, executable, etc.
        @param(AIconName
@@ -357,8 +360,9 @@ uses
     , uPixMapGtk, gdk2pixbuf, gdk2, glib2
   {$ENDIF}
   {$IFDEF MSWINDOWS}
-    , CommCtrl, ShellAPI, Windows, DCFileAttributes, uBitmap, uGdiPlus,
-      IntfGraphics, DCConvertEncoding, uShlObjAdditional, uShellFolder
+    , ActiveX, CommCtrl, ShellAPI, Windows, DCFileAttributes, uBitmap, uGdiPlus,
+      IntfGraphics, DCConvertEncoding, uShlObjAdditional, uShellFolder,
+      uShellFileSourceUtil
   {$ELSE}
     , StrUtils, Types, DCBasicTypes
   {$ENDIF}
@@ -369,6 +373,11 @@ uses
   , Math, uRabbitVCS
   {$ENDIF}
   ;
+
+{$IF DEFINED(MSWINDOWS)}
+type
+  TBitmap = Graphics.TBitmap;
+{$ENDIF}
 
 {$IF DEFINED(MSWINDOWS) OR DEFINED(RabbitVCS)}
 const
@@ -729,7 +738,7 @@ begin
     FreeAndNil(FIconTheme);
   {$ENDIF}
 {$ENDIF}
-  FreeThenNil(FDCIconTheme);
+  FreeAndNil(FDCIconTheme);
 end;
 
 {$IF DEFINED(UNIX) AND NOT (DEFINED(DARWIN) OR DEFINED(HAIKU))}
@@ -1330,6 +1339,34 @@ end;
 {$ENDIF}
 
 {$IFDEF WINDOWS}
+function TPixMapManager.GetShellFolderIcon(AFile: TFile): PtrInt;
+const
+  uFlags: UINT = SHGFI_SYSICONINDEX or SHGFI_PIDL;
+var
+  FileInfo: TSHFileInfoW;
+begin
+  if (SHGetFileInfoW(PWideChar(TFileShellProperty(AFile.LinkProperty).Item),
+                     0, {%H-}FileInfo, SizeOf(FileInfo), uFlags) <> 0) then
+  begin
+    Result := FileInfo.iIcon + SystemIconIndexStart;
+    {$IF DEFINED(LCLQT5)}
+    FPixmapsLock.Acquire;
+    try
+      Result := CheckAddSystemIcon(Result);
+    finally
+      FPixmapsLock.Release;
+    end;
+    {$ENDIF}
+    Exit;
+  end;
+  // Could not retrieve the icon
+  if AFile.IsDirectory then
+    Result := FiDirIconID
+  else begin
+    Result := FiDefaultIconID;
+  end;
+end;
+
 function TPixMapManager.GetIconResourceIndex(const IconPath: String; out IconFile: String; out IconIndex: PtrInt): Boolean;
 var
   iPos, iIndex: Integer;
@@ -1498,7 +1535,7 @@ begin
           TStringList(THtDataNode(nodeList.Items[J]).Data).Free;
     end;
 
-  FreeThenNil(FExtToMimeIconName);
+  FreeAndNil(FExtToMimeIconName);
   {$ENDIF}
 
   {$IF DEFINED(MSWINDOWS) and DEFINED(LCLQT5)}
@@ -1506,8 +1543,8 @@ begin
   {$ENDIF}
 
   DestroyIconTheme;
-  FreeThenNil(FThemePixmapsFileNames);
-  FreeThenNil(FPixmapsLock);
+  FreeAndNil(FThemePixmapsFileNames);
+  FreeAndNil(FPixmapsLock);
 
   inherited Destroy;
 end;
@@ -1926,6 +1963,8 @@ var
   FileInfo: TSHFileInfoW;
   dwFileAttributes: DWORD;
   uFlags: UINT;
+const
+  FILE_ATTRIBUTE_SHELL = FILE_ATTRIBUTE_DEVICE or FILE_ATTRIBUTE_VIRTUAL;
 {$ENDIF}
 begin
   Result := -1;
@@ -1971,7 +2010,18 @@ begin
           if Result < 0 then Result := FiDirIconID;
         end;
         Exit;
+      end
+      {$IF DEFINED(MSWINDOWS)}
+      else if (AFile.Attributes and FILE_ATTRIBUTE_SHELL = FILE_ATTRIBUTE_SHELL) and Assigned(AFile.LinkProperty) then
+      begin
+        if not LoadIcon then
+          Result := -1
+        else begin
+          Result:= GetShellFolderIcon(AFile);
+        end;
+        Exit;
       end;
+      {$ENDIF}
     end;
 
     if IsDirectory or IsLinkToDirectory then

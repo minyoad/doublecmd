@@ -3,7 +3,7 @@
    -------------------------------------------------------------------------
    Quick view panel
 
-   Copyright (C) 2009-2022 Alexander Koblov (alexx2000@mail.ru)
+   Copyright (C) 2009-2023 Alexander Koblov (alexx2000@mail.ru)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -116,7 +116,7 @@ begin
   TFileViewPage(FFileView.NotebookPage).OnChangeFileView:= nil;
   FViewer.ExitQuickView;
   FFileViewPage.FileView.Visible:= True;
-  FreeThenNil(FViewer);
+  FreeAndNil(FViewer);
   FFileSource:= nil;
   FFileView.SetFocus;
   inherited Destroy;
@@ -286,7 +286,7 @@ begin
     if FFileSource.IsPathAtRoot(parentDir) then
       showMsg:= rsPropsFolder + ': ' + parentDir
     else
-      fullPath:= parentDir;
+      fullPath:= ExcludeTrailingBackslash(parentDir);
   end;
 end;
 

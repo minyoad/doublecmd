@@ -1664,8 +1664,8 @@ begin
   end;
 
   Image.Picture.Bitmap.LoadFromIntfImage(TargetImg);
-  FreeThenNil(SourceImg);
-  FreeThenNil(TargetImg);
+  FreeAndNil(SourceImg);
+  FreeAndNil(TargetImg);
   AdjustImageSize;
   CreateTmp;
 end;
@@ -1704,8 +1704,8 @@ begin
 
 
   Image.Picture.Bitmap.LoadFromIntfImage(TargetImg);
-  FreeThenNil(SourceImg);
-  FreeThenNil(TargetImg);
+  FreeAndNil(SourceImg);
+  FreeAndNil(TargetImg);
   AdjustImageSize;
   CreateTmp;
 end;
@@ -3245,7 +3245,7 @@ begin
     try
       CreatePreview(FileList.Strings[iActiveFile], iActiveFile, True);
       sExt:= ExtractFileExt(FileList.Strings[iActiveFile]);
-      SaveImageAs(sExt, True, 80);
+      SaveImageAs(sExt, True, gViewerJpegQuality);
       CreatePreview(FileList.Strings[iActiveFile], iActiveFile);
     finally
       DrawPreview.EndUpdate;

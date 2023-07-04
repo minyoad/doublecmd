@@ -134,6 +134,7 @@ uses
   , uDCReadRSVG, uFileSourceUtil, uGdiPlusJPEG, uListGetPreviewBitmap
   , Dialogs, Clipbrd, uDebug, JwaDbt, uThumbnailProvider, uShellFolder
   , uRecycleBinFileSource, uWslFileSource, uDCReadHEIF, uDCReadWIC
+  , uShellFileSource
     {$IF DEFINED(DARKWIN)}
     , uDarkStyle
     {$ELSEIF DEFINED(LCLQT5)}
@@ -579,6 +580,16 @@ begin
     Screen.AddHandlerFormVisibleChanged(TScreenFormEvent(Handler), True);
   end;
 {$ENDIF}
+  // Register shell folder file source
+  if (Win32MajorVersion > 5) then
+  begin
+    RegisterVirtualFileSource(TShellFileSource.RootName, TShellFileSource);
+  end;
+  // Register recycle bin file source
+  if CheckWin32Version(5, 1) then
+  begin
+    RegisterVirtualFileSource(rsVfsRecycleBin, TRecycleBinFileSource);
+  end;
   // Register Windows Subsystem for Linux (WSL) file source
   if CheckWin32Version(10) then
   begin
@@ -586,11 +597,6 @@ begin
   end;
   // Register network file source
   RegisterVirtualFileSource(rsVfsNetwork, TWinNetFileSource);
-  // Register recycle bin file source
-  if CheckWin32Version(5, 1) then
-  begin
-    RegisterVirtualFileSource(rsVfsRecycleBin, TRecycleBinFileSource);
-  end;
 
   // If run under administrator
   if (IsUserAdmin = dupAccept) then
@@ -724,7 +730,7 @@ begin
     ShellContextMenu.PopUp(X, Y);
   finally
     // Free created menu
-    FreeThenNil(ShellContextMenu);
+    FreeAndNil(ShellContextMenu);
   end;
 end;
 {$ELSE}
@@ -736,7 +742,7 @@ begin
   end;
 
   // Free previous created menu
-  FreeThenNil(ShellContextMenu);
+  FreeAndNil(ShellContextMenu);
   // Create new context menu
   ShellContextMenu:= TShellContextMenu.Create(nil, Files, Background, UserWishForContextMenu);
   ShellContextMenu.OnClose := CloseEvent;
@@ -774,7 +780,7 @@ begin
   else
   begin
     // Free previous created menu
-    FreeThenNil(ShellContextMenu);
+    FreeAndNil(ShellContextMenu);
     // Create new context menu
     ShellContextMenu:= TShellContextMenu.Create(nil, ADrive);
     ShellContextMenu.OnClose := CloseEvent;
@@ -1016,7 +1022,7 @@ initialization
 {$ENDIF}
 
 finalization
-  FreeThenNil(ShellContextMenu);
+  FreeAndNil(ShellContextMenu);
 
 end.
 

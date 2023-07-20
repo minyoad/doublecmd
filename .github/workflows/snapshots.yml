@@ -8,7 +8,7 @@ on:
     - 'sdk/**'
     - 'src/**'
     branches:
-      - master
+      - my-customize
 
 concurrency:
   group: ${{ github.ref }}
@@ -68,10 +68,10 @@ jobs:
     - name: Build packages
       run: ./.github/scripts/create_snapshot.bat
 
-    - name: Deploy to snapshot server
-      run: ./.github/scripts/upload_snapshot.sh
-      shell: bash
-      env:
-        SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
-        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-        REMOTE_USER: ${{ secrets.REMOTE_USER }}
+    # - name: Deploy to snapshot server
+      # run: ./.github/scripts/upload_snapshot.sh
+      # shell: bash
+      # env:
+        # SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        # REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+        # REMOTE_USER: ${{ secrets.REMOTE_USER }}

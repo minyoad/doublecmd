@@ -65,7 +65,8 @@ rem Move created package
 copy /Y  release\*.exe %PACK_DIR%
 
 rem Create *.zip package
-copy /Y  NUL doublecmd\doublecmd.inf
+mkdir doublecmd\settings
+copy NUL doublecmd\settings\doublecmd.inf
 zip -9 -Dr %PACK_DIR%\doublecmd-%DC_VER%.%CPU_TARGET%-%OS_TARGET%.zip doublecmd
 
 rem Clean temp directories
